@@ -1,0 +1,932 @@
+import { useState, useEffect, useRef, useCallback } from “react”;
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const VIRTUES = {
+courage:    { label: “Courage”,    color: “#D4A843”, dim: “#5c4418”, desc: “Physical & mental fortitude” },
+wisdom:     { label: “Wisdom”,     color: “#7BA08A”, dim: “#2e4a35”, desc: “Knowledge & reflection” },
+temperance: { label: “Temperance”, color: “#7a95a8”, dim: “#2c3e4d”, desc: “Restraint & moderation” },
+justice:    { label: “Justice”,    color: “#b57a6e”, dim: “#4a2e29”, desc: “Duty & right action” },
+};
+
+const STOIC_CONTENT = [
+{ quote: “The obstacle is the way.”, author: “Marcus Aurelius, Meditations”, interpretation: “Every difficulty is not in opposition to your progress — it is the path itself. Resistance builds the character required for what comes next.”, prompt: “What obstacle before you today can become the work itself?” },
+{ quote: “Waste no more time arguing what a good man should be. Be one.”, author: “Marcus Aurelius, Meditations”, interpretation: “Action supersedes deliberation. The time spent justifying virtue is time stolen from practicing it.”, prompt: “Where have you been theorising instead of acting?” },
+{ quote: “He suffers more than necessary, who suffers before it is necessary.”, author: “Seneca, Letters to Lucilius”, interpretation: “Most suffering is anticipatory. The feared event rarely arrives as imagined. Presence is the antidote to dread.”, prompt: “What are you dreading that has not yet occurred?” },
+{ quote: “You have power over your mind — not outside events. Realise this, and you will find strength.”, author: “Marcus Aurelius, Meditations”, interpretation: “Your domain is internal. The external world is indifferent. Mastery begins at the boundary of what you control.”, prompt: “What are you trying to control that lies beyond your reach?” },
+{ quote: “Difficulties strengthen the mind, as labour does the body.”, author: “Seneca, Moral Letters”, interpretation: “Comfort atrophies capacity. The mind, like muscle, requires resistance to grow. Seek the difficult deliberately.”, prompt: “What difficulty are you avoiding that would make you stronger?” },
+{ quote: “First say to yourself what you would be; and then do what you have to do.”, author: “Epictetus, Discourses”, interpretation: “Identity precedes action. Define who you are becoming before you begin. Let that definition drive every decision today.”, prompt: “Who are you becoming? Does today’s behaviour reflect it?” },
+{ quote: “Be tolerant with others and strict with yourself.”, author: “Marcus Aurelius, Meditations”, interpretation: “The standard you apply to yourself must exceed the one you hold others to. Accountability flows inward first.”, prompt: “Where are you holding others to a higher standard than yourself?” },
+{ quote: “It is not death that a man should fear, but he should fear never beginning to live.”, author: “Marcus Aurelius, Meditations”, interpretation: “The unlived life is the greater loss. Begin what must be begun. Hesitation is its own form of failure.”, prompt: “What have you been postponing that deserves to begin today?” },
+{ quote: “Wealth consists not in having great possessions, but in having few wants.”, author: “Epictetus, Discourses”, interpretation: “Desire is infinite; satisfaction is fleeting. Reduce what you require and you expand your freedom considerably.”, prompt: “What desire, if released, would give you more freedom?” },
+{ quote: “The best revenge is not to be like your enemy.”, author: “Marcus Aurelius, Meditations”, interpretation: “Do not allow another’s poor character to corrupt yours. The response to indignity is not to descend to it.”, prompt: “Where are you being pulled toward behaviour beneath your standard?” },
+];
+
+const VIRTUE_LEVELS = [
+{ level: 1,  threshold: 0,    title: “Initiate” },
+{ level: 2,  threshold: 50,   title: “Aware” },
+{ level: 3,  threshold: 130,  title: “Consistent” },
+{ level: 4,  threshold: 250,  title: “Disciplined” },
+{ level: 5,  threshold: 410,  title: “Focused” },
+{ level: 6,  threshold: 620,  title: “Resolute” },
+{ level: 7,  threshold: 880,  title: “Steadfast” },
+{ level: 8,  threshold: 1200, title: “Virtuous” },
+{ level: 9,  threshold: 1600, title: “Exceptional” },
+{ level: 10, threshold: 2100, title: “Mastery” },
+];
+
+const TIERS = [
+{ min: 0,  label: “Undisciplined”, color: “#666” },
+{ min: 30, label: “Developing”,    color: “#888” },
+{ min: 50, label: “Consistent”,    color: “#7BA08A” },
+{ min: 70, label: “Disciplined”,   color: “#7a95a8” },
+{ min: 85, label: “Exceptional”,   color: “#D4A843” },
+];
+
+// ─── Utilities ─────────────────────────────────────────────────────────────────
+
+function todayStr() {
+return new Date().toISOString().split(“T”)[0];
+}
+
+function getWeekDates() {
+const today = new Date();
+return Array.from({ length: 7 }, (_, i) => {
+const d = new Date(today);
+d.setDate(today.getDate() - (6 - i));
+return d.toISOString().split(“T”)[0];
+});
+}
+
+function getVirtueLevel(xp) {
+let cur = VIRTUE_LEVELS[0], nxt = VIRTUE_LEVELS[1];
+for (let i = VIRTUE_LEVELS.length - 1; i >= 0; i–) {
+if (xp >= VIRTUE_LEVELS[i].threshold) {
+cur = VIRTUE_LEVELS[i];
+nxt = VIRTUE_LEVELS[i + 1] || null;
+break;
+}
+}
+const progress = nxt
+? ((xp - cur.threshold) / (nxt.threshold - cur.threshold)) * 100
+: 100;
+return { current: cur, next: nxt, progress };
+}
+
+function calcWeeklyScore(goals, logs) {
+if (!goals.length) return 0;
+const week = getWeekDates();
+let totalWeight = 0, earnedWeight = 0;
+goals.forEach(goal => {
+const w = goal.weight || 1;
+totalWeight += w * 7;
+week.forEach(date => {
+const dayLog = logs[date] || {};
+const val = dayLog[goal.id];
+if (goal.type === “binary” || goal.type === “streak”) {
+if (val === true || val === 1) earnedWeight += w;
+} else if (goal.type === “quantitative”) {
+if (val && parseFloat(val) >= parseFloat(goal.target_value || 1)) earnedWeight += w;
+else if (val && parseFloat(val) > 0) earnedWeight += w * (parseFloat(val) / parseFloat(goal.target_value || 1));
+}
+});
+});
+return totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0;
+}
+
+function getTier(score) {
+return […TIERS].reverse().find(t => score >= t.min) || TIERS[0];
+}
+
+function uid() {
+return Math.random().toString(36).slice(2, 9);
+}
+
+async function storageGet(key, def) {
+try {
+const r = await window.storage.get(key);
+return r ? JSON.parse(r.value) : def;
+} catch { return def; }
+}
+
+async function storageSet(key, val) {
+try { await window.storage.set(key, JSON.stringify(val)); } catch {}
+}
+
+// ─── Icons ─────────────────────────────────────────────────────────────────────
+
+const LogIcon = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+<rect x="3" y="4" width="18" height="16" rx="1"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/>
+</svg>
+);
+const GoalsIcon = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/>
+</svg>
+);
+const ProgressIcon = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+<polyline points="3,17 8,12 13,15 21,7"/><polyline points="17,7 21,7 21,11"/>
+</svg>
+);
+const SettingsIcon = () => (
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+<circle cx="12" cy="12" r="2.5"/>
+<path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+</svg>
+);
+const CheckIcon = () => (
+<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5">
+<polyline points="3,8 6.5,11.5 13,4.5"/>
+</svg>
+);
+
+// ─── Focus Screen ──────────────────────────────────────────────────────────────
+
+function FocusScreen({ focus, timer, ready, reflection, onReflection, onProceed, reflectionEnabled }) {
+const pct = ((12 - timer) / 12) * 100;
+return (
+<div className="focus-screen fade-in">
+<div className="focus-bg-glow" />
+<div className="focus-label">Daily Focus · {new Date().toLocaleDateString(“en-GB”, { weekday: “long”, day: “numeric”, month: “long” }).toUpperCase()}</div>
+<blockquote className="focus-quote">”{focus.quote}”</blockquote>
+<div className="focus-author">— {focus.author}</div>
+<div className="focus-divider" />
+<p className="focus-interpretation">{focus.interpretation}</p>
+<p className="focus-prompt">{focus.prompt}</p>
+{reflectionEnabled && (
+<textarea
+className=“focus-reflection”
+placeholder=“One line. Your answer.”
+value={reflection}
+onChange={e => onReflection(e.target.value)}
+maxLength={200}
+/>
+)}
+<div className="focus-timer">
+<div className="timer-track">
+<div className=“timer-fill” style={{ width: `${pct}%` }} />
+</div>
+<span className="timer-count">{timer > 0 ? timer : “”}</span>
+</div>
+<button className="btn-proceed" disabled={!ready} onClick={onProceed}>
+{ready ? “Proceed” : `${timer}s`}
+</button>
+</div>
+);
+}
+
+// ─── Log Tab ───────────────────────────────────────────────────────────────────
+
+function LogTab({ goals, logs, onLog }) {
+const today = todayStr();
+const todayLogs = logs[today] || {};
+const weeklyScore = calcWeeklyScore(goals, logs);
+const tier = getTier(weeklyScore);
+const weekDates = getWeekDates();
+const [animIds, setAnimIds] = useState([]);
+
+const handleBinaryLog = (goalId) => {
+const cur = todayLogs[goalId];
+onLog(goalId, cur ? 0 : 1);
+setAnimIds(p => […p, goalId]);
+setTimeout(() => setAnimIds(p => p.filter(x => x !== goalId)), 300);
+};
+
+const todayGoals = goals.filter(g => g.timeframe === “daily” || !g.timeframe || g.timeframe === “weekly”);
+
+return (
+<div className="log-tab fade-in">
+{/* Weekly score card */}
+<div className="score-card">
+<div>
+<div className="score-label">Weekly Performance</div>
+<div className="score-value">{weeklyScore}<span className="score-unit">/100</span></div>
+<span className=“tier-badge” style={{ color: tier.color, borderColor: tier.color }}>{tier.label}</span>
+</div>
+<div className="week-mini">
+{weekDates.map((d, i) => {
+const dayLabel = [“M”,“T”,“W”,“T”,“F”,“S”,“S”][new Date(d).getDay() === 0 ? 6 : new Date(d).getDay() - 1];
+const dayLogs = logs[d] || {};
+const done = goals.filter(g => {
+const v = dayLogs[g.id];
+if (g.type === “binary” || g.type === “streak”) return v === 1 || v === true;
+if (g.type === “quantitative”) return v && parseFloat(v) >= parseFloat(g.target_value || 1);
+return false;
+}).length;
+const isToday = d === today;
+const isFuture = d > today;
+let dotClass = “streak-dot missed”;
+if (isFuture) dotClass = “streak-dot future”;
+else if (done > 0 && done >= goals.length * 0.5) dotClass = “streak-dot done”;
+return (
+<div key={d} className={`week-day ${isToday ? "today" : ""}`}>
+<span className="week-day-label">{dayLabel}</span>
+<div className={dotClass} />
+</div>
+);
+})}
+</div>
+</div>
+
+```
+  <div className="section-header">
+    <span className="section-title">Today · {today}</span>
+    <span className="section-title" style={{ color: "var(--text)" }}>
+      {Object.keys(todayLogs).filter(k => todayLogs[k]).length}/{todayGoals.length}
+    </span>
+  </div>
+
+  {todayGoals.length === 0 ? (
+    <div className="empty-state">
+      <p>No goals defined.</p>
+      <p>Add goals in the Goals tab.</p>
+    </div>
+  ) : (
+    todayGoals.map(goal => {
+      const virtue = VIRTUES[goal.virtue] || VIRTUES.courage;
+      const logged = todayLogs[goal.id];
+      const isAnimating = animIds.includes(goal.id);
+
+      return (
+        <div
+          key={goal.id}
+          className={`goal-item ${logged ? "logged" : ""}`}
+          onClick={() => goal.type !== "quantitative" && handleBinaryLog(goal.id)}
+        >
+          <div className="goal-virtue-dot" style={{ background: virtue.color }} />
+          <div className="goal-info">
+            <div className="goal-name">{goal.name}</div>
+            <div className="goal-meta">
+              {virtue.label.toUpperCase()} · {(goal.type || "binary").toUpperCase()}
+              {goal.type === "quantitative" && goal.target_value ? ` · TARGET: ${goal.target_value}${goal.unit ? " " + goal.unit : ""}` : ""}
+            </div>
+          </div>
+          {goal.type === "quantitative" ? (
+            <input
+              className="quant-input"
+              type="number"
+              placeholder="0"
+              value={logged || ""}
+              onClick={e => e.stopPropagation()}
+              onChange={e => onLog(goal.id, e.target.value)}
+            />
+          ) : (
+            <div className={`goal-check ${logged ? "checked" : ""} ${isAnimating ? "check-pop" : ""}`}>
+              {logged ? <CheckIcon /> : null}
+            </div>
+          )}
+        </div>
+      );
+    })
+  )}
+
+  {/* Monthly / yearly goals section */}
+  {goals.filter(g => g.timeframe === "monthly" || g.timeframe === "yearly").length > 0 && (
+    <>
+      <div className="section-header" style={{ marginTop: 24 }}>
+        <span className="section-title">Long-term Goals</span>
+      </div>
+      {goals.filter(g => g.timeframe === "monthly" || g.timeframe === "yearly").map(goal => {
+        const virtue = VIRTUES[goal.virtue] || VIRTUES.courage;
+        const logged = todayLogs[goal.id];
+        return (
+          <div key={goal.id} className={`goal-item ${logged ? "logged" : ""}`}
+            onClick={() => goal.type !== "quantitative" && handleBinaryLog(goal.id)}>
+            <div className="goal-virtue-dot" style={{ background: virtue.color }} />
+            <div className="goal-info">
+              <div className="goal-name">{goal.name}</div>
+              <div className="goal-meta">{virtue.label.toUpperCase()} · {(goal.timeframe || "").toUpperCase()}
+                {goal.type === "quantitative" && goal.target_value ? ` · TARGET: ${goal.target_value}` : ""}
+              </div>
+            </div>
+            {goal.type === "quantitative" ? (
+              <input className="quant-input" type="number" placeholder="0" value={logged || ""}
+                onClick={e => e.stopPropagation()} onChange={e => onLog(goal.id, e.target.value)} />
+            ) : (
+              <div className={`goal-check ${logged ? "checked" : ""}`}>{logged ? <CheckIcon /> : null}</div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  )}
+</div>
+```
+
+);
+}
+
+// ─── Goals Tab ─────────────────────────────────────────────────────────────────
+
+function AddGoalModal({ onSave, onClose }) {
+const [form, setForm] = useState({ name: “”, type: “binary”, virtue: “”, timeframe: “daily”, weight: 2, target_value: “”, unit: “” });
+const valid = form.name.trim() && form.virtue;
+
+return (
+<div className="modal-overlay" onClick={onClose}>
+<div className=“modal” onClick={e => e.stopPropagation()}>
+<div className="modal-title">New Goal</div>
+<div className="form-group">
+<label className="form-label">Goal Name</label>
+<input className=“form-input” placeholder=“e.g. Gym session” value={form.name}
+onChange={e => setForm(p => ({ …p, name: e.target.value }))} />
+</div>
+<div className="form-group">
+<label className="form-label">Virtue</label>
+<div className="virtue-grid">
+{Object.entries(VIRTUES).map(([key, v]) => (
+<button key={key}
+className={`virtue-btn ${form.virtue === key ? "selected" : ""}`}
+style={form.virtue === key ? { background: v.color, borderColor: v.color } : { borderColor: v.dim }}
+onClick={() => setForm(p => ({ …p, virtue: key }))}>
+{v.label}
+</button>
+))}
+</div>
+</div>
+<div className="form-group">
+<label className="form-label">Type</label>
+<select className=“form-select” value={form.type} onChange={e => setForm(p => ({ …p, type: e.target.value }))}>
+<option value="binary">Binary (done / not done)</option>
+<option value="quantitative">Quantitative (numeric target)</option>
+<option value="streak">Streak (daily chain)</option>
+</select>
+</div>
+{form.type === “quantitative” && (
+<div className="form-group">
+<label className="form-label">Target Value</label>
+<div style={{ display: “flex”, gap: 8 }}>
+<input className=“form-input” type=“number” placeholder=“e.g. 10000” value={form.target_value}
+onChange={e => setForm(p => ({ …p, target_value: e.target.value }))} style={{ flex: 2 }} />
+<input className=“form-input” placeholder=“unit” value={form.unit}
+onChange={e => setForm(p => ({ …p, unit: e.target.value }))} style={{ flex: 1 }} />
+</div>
+</div>
+)}
+<div className="form-group">
+<label className="form-label">Timeframe</label>
+<select className=“form-select” value={form.timeframe} onChange={e => setForm(p => ({ …p, timeframe: e.target.value }))}>
+<option value="daily">Daily</option>
+<option value="weekly">Weekly</option>
+<option value="monthly">Monthly</option>
+<option value="yearly">Yearly</option>
+</select>
+</div>
+<div className="form-group">
+<label className="form-label">Weight (Importance)</label>
+<div className="weight-row">
+{[1, 2, 3, 4, 5].map(w => (
+<button key={w} className={`weight-btn ${form.weight === w ? "selected" : ""}`}
+onClick={() => setForm(p => ({ …p, weight: w }))}>{w}</button>
+))}
+</div>
+</div>
+<div className="modal-actions">
+<button className="btn-cancel" onClick={onClose}>Cancel</button>
+<button className=“btn-save” disabled={!valid} onClick={() => onSave({ …form, id: uid() })}>Add Goal</button>
+</div>
+</div>
+</div>
+);
+}
+
+function GoalsTab({ goals, onUpdate }) {
+const [showAdd, setShowAdd] = useState(false);
+
+const handleSave = (goal) => {
+onUpdate([…goals, goal]);
+setShowAdd(false);
+};
+
+const handleDelete = (id) => {
+onUpdate(goals.filter(g => g.id !== id));
+};
+
+const byVirtue = Object.keys(VIRTUES).reduce((acc, v) => {
+acc[v] = goals.filter(g => g.virtue === v);
+return acc;
+}, {});
+
+return (
+<div className="goals-tab fade-in">
+<button className=“btn-add” onClick={() => setShowAdd(true)}>+ Add Goal</button>
+{goals.length === 0 ? (
+<div className="empty-state">
+<p>No goals defined.</p>
+<p>Add your first goal above.</p>
+</div>
+) : (
+Object.entries(byVirtue).map(([key, vGoals]) => {
+if (!vGoals.length) return null;
+const virtue = VIRTUES[key];
+return (
+<div key={key} style={{ marginBottom: 24 }}>
+<div className="section-header">
+<span className=“section-title” style={{ color: virtue.color }}>{virtue.label}</span>
+<span className="section-title">{vGoals.length}</span>
+</div>
+{vGoals.map(goal => (
+<div key={goal.id} className="goal-manage-item">
+<div className=“goal-virtue-dot” style={{ background: virtue.color }} />
+<div className="goal-manage-info">
+<div className="goal-name">{goal.name}</div>
+<div className="goal-meta">
+{(goal.type || “binary”).toUpperCase()} · {(goal.timeframe || “daily”).toUpperCase()} · WEIGHT {goal.weight}
+{goal.type === “quantitative” && goal.target_value ? ` · ${goal.target_value}${goal.unit ? " " + goal.unit : ""}` : “”}
+</div>
+</div>
+<button className=“btn-delete” onClick={() => handleDelete(goal.id)}>×</button>
+</div>
+))}
+</div>
+);
+})
+)}
+{showAdd && <AddGoalModal onSave={handleSave} onClose={() => setShowAdd(false)} />}
+</div>
+);
+}
+
+// ─── Progress Tab ──────────────────────────────────────────────────────────────
+
+function VirtueTree({ virtue, xp, goals, logs }) {
+const { current, next, progress } = getVirtueLevel(xp);
+const v = VIRTUES[virtue];
+const relatedGoals = goals.filter(g => g.virtue === virtue);
+const today = todayStr();
+const todayLogs = logs[today] || {};
+const completedToday = relatedGoals.filter(g => {
+const val = todayLogs[g.id];
+if (g.type === “quantitative”) return val && parseFloat(val) >= parseFloat(g.target_value || 1);
+return val === 1 || val === true;
+}).length;
+
+return (
+<div className="virtue-tree-card" style={{ borderColor: xp > 0 ? v.dim : “var(–border)” }}>
+<div className="virtue-tree-header">
+<span className=“virtue-tree-name” style={{ color: v.color }}>{v.label}</span>
+<span style={{ marginLeft: “auto”, fontFamily: “var(–font-mono)”, fontSize: “var(–fs-xs)”, color: “var(–text-dim)”, letterSpacing: “0.1em” }}>
+{relatedGoals.length > 0 ? `${completedToday}/${relatedGoals.length} today` : “no goals”}
+</span>
+</div>
+<div style={{ display: “flex”, alignItems: “flex-end”, gap: 12, marginBottom: 8 }}>
+<span className="virtue-tree-level" style={{ color: xp > 0 ? v.color : “var(–text-dim)” }}>
+{current.level}
+</span>
+<div style={{ flex: 1 }}>
+<div className="virtue-tree-title">{current.title}</div>
+<div className="progress-track">
+<div className=“progress-fill” style={{ width: `${progress}%`, background: v.color }} />
+</div>
+<div className="progress-meta">
+<span>{xp} XP</span>
+{next ? <span>→ {next.title} · {next.threshold} XP</span> : <span>Mastery achieved</span>}
+</div>
+</div>
+</div>
+{/* Level nodes */}
+<div className="level-nodes">
+{VIRTUE_LEVELS.map(lvl => (
+<div key={lvl.level}
+className={`level-node ${lvl.level <= current.level ? "reached" : ""} ${lvl.level === current.level ? "current" : ""}`}
+title={`Level ${lvl.level}: ${lvl.title}`}
+style={lvl.level <= current.level ? { background: v.color, borderColor: v.color } :
+lvl.level === current.level + 1 ? { borderColor: v.dim } : {}}
+/>
+))}
+</div>
+</div>
+);
+}
+
+function ProgressTab({ goals, logs, virtueXP }) {
+const weeklyScore = calcWeeklyScore(goals, logs);
+const tier = getTier(weeklyScore);
+const week = getWeekDates();
+const today = todayStr();
+
+// Per-day score
+const dayScores = week.map(date => {
+if (date > today) return null;
+if (!goals.length) return 0;
+let total = 0, earned = 0;
+goals.forEach(g => {
+const w = g.weight || 1;
+total += w;
+const val = (logs[date] || {})[g.id];
+if (g.type === “quantitative”) {
+if (val && parseFloat(val) >= parseFloat(g.target_value || 1)) earned += w;
+else if (val && parseFloat(val) > 0) earned += w * (parseFloat(val) / parseFloat(g.target_value || 1));
+} else {
+if (val === 1 || val === true) earned += w;
+}
+});
+return total > 0 ? Math.round((earned / total) * 100) : 0;
+});
+
+const totalXP = Object.values(virtueXP).reduce((a, b) => a + b, 0);
+const dayLabels = [“Mon”,“Tue”,“Wed”,“Thu”,“Fri”,“Sat”,“Sun”];
+
+return (
+<div className="progress-tab fade-in">
+{/* Overall score */}
+<div className="score-card">
+<div>
+<div className="score-label">Weekly Score</div>
+<div className="score-value">{weeklyScore}<span className="score-unit">/100</span></div>
+<span className=“tier-badge” style={{ color: tier.color, borderColor: tier.color }}>{tier.label}</span>
+</div>
+<div style={{ textAlign: “right” }}>
+<div className="score-label">Total XP</div>
+<div style={{ fontFamily: “var(–font-display)”, fontSize: “var(–fs-xl)”, fontWeight: 300, color: “var(–gold)” }}>{totalXP}</div>
+</div>
+</div>
+
+```
+  {/* Week grid */}
+  <div className="section-header" style={{ marginTop: 4, marginBottom: 8 }}>
+    <span className="section-title">This Week</span>
+  </div>
+  <div className="week-grid">
+    {week.map((d, i) => {
+      const score = dayScores[i];
+      const isFuture = d > today;
+      const isToday = d === today;
+      const dayIdx = new Date(d).getDay();
+      const dayLabel = dayLabels[dayIdx === 0 ? 6 : dayIdx - 1];
+      return (
+        <div key={d} className={`week-cell ${isToday ? "today" : ""}`}>
+          <span className="day-label">{dayLabel}</span>
+          {!isFuture && score !== null ? (
+            <span className="day-score" style={{ color: score >= 70 ? "var(--gold)" : score >= 40 ? "var(--text)" : "var(--text-dim)" }}>
+              {score}
+            </span>
+          ) : (
+            <span className="day-score" style={{ color: "var(--border)" }}>—</span>
+          )}
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Virtue skill trees */}
+  <div className="section-header" style={{ marginTop: 24 }}>
+    <span className="section-title">Virtue Progression</span>
+  </div>
+  {Object.keys(VIRTUES).map(v => (
+    <VirtueTree key={v} virtue={v} xp={virtueXP[v] || 0} goals={goals} logs={logs} />
+  ))}
+</div>
+```
+
+);
+}
+
+// ─── Settings Tab ──────────────────────────────────────────────────────────────
+
+function SettingsTab({ settings, onUpdate }) {
+const set = (key, val) => onUpdate({ …settings, [key]: val });
+
+return (
+<div className="settings-tab fade-in">
+<div className="settings-section">
+<div className="settings-section-title">Appearance</div>
+<div className="settings-row">
+<span className="settings-label">Text Size</span>
+<div className="select-row">
+{[“small”,“medium”,“large”].map(s => (
+<button key={s} className={`select-chip ${settings.textSize === s ? "active" : ""}`}
+onClick={() => set(“textSize”, s)}>{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+))}
+</div>
+</div>
+</div>
+<div className="settings-section">
+<div className="settings-section-title">Daily Focus</div>
+<div className="settings-row">
+<span className="settings-label">Reflection Input</span>
+<button className={`toggle ${settings.reflectionEnabled ? "on" : ""}`}
+onClick={() => set(“reflectionEnabled”, !settings.reflectionEnabled)} />
+</div>
+<div className="settings-row">
+<span className="settings-label">Reopen Focus Screen</span>
+<button className=“select-chip” onClick={async () => {
+await storageSet(“stoic-focus-date”, “”);
+window.location.reload();
+}}>Reset</button>
+</div>
+</div>
+<div className="settings-section">
+<div className="settings-section-title">Data</div>
+<div className="settings-row">
+<span className="settings-label">Reset All Progress</span>
+<button className=“select-chip” style={{ color: “#b55”, borderColor: “#b55” }}
+onClick={async () => {
+if (window.confirm(“Reset all data? This cannot be undone.”)) {
+await storageSet(“stoic-goals”, []);
+await storageSet(“stoic-logs”, {});
+await storageSet(“stoic-virtue-xp”, { courage: 0, wisdom: 0, temperance: 0, justice: 0 });
+await storageSet(“stoic-focus-date”, “”);
+window.location.reload();
+}
+}}>Clear</button>
+</div>
+</div>
+<div className="app-version">STOIC · v1.0.0 · Performance & Discipline System</div>
+</div>
+);
+}
+
+// ─── Main App ──────────────────────────────────────────────────────────────────
+
+export default function StoicApp() {
+const [loaded, setLoaded] = useState(false);
+const [screen, setScreen] = useState(“focus”);
+const [activeTab, setActiveTab] = useState(“log”);
+const [goals, setGoals] = useState([]);
+const [logs, setLogs] = useState({});
+const [virtueXP, setVirtueXP] = useState({ courage: 0, wisdom: 0, temperance: 0, justice: 0 });
+const [focusDate, setFocusDate] = useState(””);
+const [settings, setSettings] = useState({ theme: “dark”, textSize: “medium”, reflectionEnabled: true });
+const [focusTimer, setFocusTimer] = useState(12);
+const [focusReady, setFocusReady] = useState(false);
+const [reflection, setReflection] = useState(””);
+const [focusIdx, setFocusIdx] = useState(0);
+
+useEffect(() => {
+async function load() {
+const [g, l, xp, fd, s] = await Promise.all([
+storageGet(“stoic-goals”, []),
+storageGet(“stoic-logs”, {}),
+storageGet(“stoic-virtue-xp”, { courage: 0, wisdom: 0, temperance: 0, justice: 0 }),
+storageGet(“stoic-focus-date”, “”),
+storageGet(“stoic-settings”, { theme: “dark”, textSize: “medium”, reflectionEnabled: true }),
+]);
+setGoals(g); setLogs(l); setVirtueXP(xp); setFocusDate(fd); setSettings(s);
+const today = todayStr();
+const hash = today.split(”-”).reduce((a, n) => a + parseInt(n), 0);
+setFocusIdx(hash % STOIC_CONTENT.length);
+if (fd === today) setScreen(“main”);
+setLoaded(true);
+}
+load();
+}, []);
+
+useEffect(() => {
+if (screen !== “focus” || !loaded || focusTimer <= 0) {
+if (focusTimer <= 0) setFocusReady(true);
+return;
+}
+const t = setTimeout(() => setFocusTimer(v => v - 1), 1000);
+return () => clearTimeout(t);
+}, [screen, focusTimer, loaded]);
+
+const handleProceed = useCallback(async () => {
+const today = todayStr();
+setFocusDate(today);
+await storageSet(“stoic-focus-date”, today);
+setScreen(“main”);
+}, []);
+
+const updateGoals = useCallback(async (ng) => {
+setGoals(ng);
+await storageSet(“stoic-goals”, ng);
+}, []);
+
+const logGoal = useCallback(async (goalId, value) => {
+const today = todayStr();
+const newLogs = { …logs, [today]: { …(logs[today] || {}), [goalId]: value } };
+setLogs(newLogs);
+await storageSet(“stoic-logs”, newLogs);
+const goal = goals.find(g => g.id === goalId);
+if (goal && value && value !== 0 && value !== “0” && value !== “”) {
+const xpGain = (goal.weight || 1) * 10;
+const prevXP = virtueXP[goal.virtue] || 0;
+const prevLogged = (logs[today] || {})[goalId];
+if (!prevLogged || prevLogged === 0) {
+const newXP = { …virtueXP, [goal.virtue]: prevXP + xpGain };
+setVirtueXP(newXP);
+await storageSet(“stoic-virtue-xp”, newXP);
+}
+}
+}, [logs, goals, virtueXP]);
+
+const updateSettings = useCallback(async (ns) => {
+setSettings(ns);
+await storageSet(“stoic-settings”, ns);
+}, []);
+
+if (!loaded) return (
+<div style={{ background: “#080808”, height: “100vh”, display: “flex”, alignItems: “center”, justifyContent: “center”, color: “#333”, fontFamily: “monospace”, letterSpacing: “0.3em”, fontSize: “11px” }}>
+LOADING
+</div>
+);
+
+return (
+<div className="app" data-size={settings.textSize}>
+<style>{`
+@import url(‘https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap’);
+
+```
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    
+    :root{
+      --bg:#080808;--bg-s:#111;--bg-e:#1a1a1a;
+      --text:#e0d8cc;--dim:#55504a;--mid:#908880;
+      --gold:#c9a84c;--gold-d:#5a4818;
+      --green:#7BA08A;--blue:#7a95a8;--rust:#b57a6e;
+      --border:#1e1e1e;
+      --ff-d:'Cormorant Garamond',Georgia,serif;
+      --ff-m:'DM Mono','Courier New',monospace;
+      --xs:10px;--sm:12px;--base:14px;--md:16px;--lg:20px;--xl:28px;--2xl:42px;
+    }
+    [data-size=small]{--xs:9px;--sm:11px;--base:13px;--md:15px;--lg:18px;--xl:24px;--2xl:36px;}
+    [data-size=large]{--xs:11px;--sm:13px;--base:16px;--md:18px;--lg:22px;--xl:32px;--2xl:48px;}
+    
+    body,.app{font-family:var(--ff-m);background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto;overflow-x:hidden;}
+    
+    /* ─ Focus Screen ─ */
+    .focus-screen{min-height:100vh;display:flex;flex-direction:column;padding:44px 28px 36px;position:relative;overflow:hidden;background:var(--bg);}
+    .focus-bg-glow{position:absolute;top:0;left:0;right:0;height:300px;background:radial-gradient(ellipse at 70% 0%,rgba(201,168,76,.06) 0%,transparent 65%),radial-gradient(ellipse at 20% 40%,rgba(123,160,138,.04) 0%,transparent 60%);pointer-events:none;}
+    .focus-label{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.3em;color:var(--dim);text-transform:uppercase;margin-bottom:44px;}
+    .focus-quote{font-family:var(--ff-d);font-size:var(--xl);font-weight:300;font-style:italic;line-height:1.3;color:var(--text);margin-bottom:10px;}
+    .focus-author{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;color:var(--gold);text-transform:uppercase;margin-bottom:36px;}
+    .focus-divider{width:32px;height:1px;background:var(--border);margin-bottom:24px;}
+    .focus-interpretation{font-family:var(--ff-m);font-size:var(--sm);line-height:1.75;color:var(--mid);margin-bottom:24px;flex:1;}
+    .focus-prompt{font-family:var(--ff-d);font-size:var(--md);font-style:italic;color:var(--text);line-height:1.5;margin-bottom:28px;padding-left:14px;border-left:1px solid var(--gold-d);}
+    .focus-reflection{width:100%;background:var(--bg-s);border:1px solid var(--border);color:var(--text);font-family:var(--ff-m);font-size:var(--sm);padding:10px 12px;resize:none;outline:none;margin-bottom:18px;height:56px;line-height:1.6;}
+    .focus-reflection::placeholder{color:var(--dim);}
+    .focus-reflection:focus{border-color:var(--gold-d);}
+    .focus-timer{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+    .timer-track{flex:1;height:1px;background:var(--border);position:relative;}
+    .timer-fill{position:absolute;left:0;top:0;height:100%;background:var(--gold);transition:width 1s linear;}
+    .timer-count{font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.1em;min-width:20px;text-align:right;}
+    .btn-proceed{width:100%;background:transparent;border:1px solid var(--gold);color:var(--gold);font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.3em;text-transform:uppercase;padding:14px;cursor:pointer;transition:background .2s,color .2s;}
+    .btn-proceed:hover:not(:disabled){background:var(--gold);color:#000;}
+    .btn-proceed:disabled{opacity:.3;cursor:default;}
+    
+    /* ─ Main App ─ */
+    .main-app{min-height:100vh;display:flex;flex-direction:column;padding-bottom:62px;}
+    .app-header{padding:18px 20px 14px;display:flex;align-items:baseline;border-bottom:1px solid var(--border);}
+    .app-logo{font-family:var(--ff-d);font-size:var(--lg);font-weight:500;letter-spacing:.25em;color:var(--text);}
+    .app-date{font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.12em;margin-left:auto;}
+    .tab-content{flex:1;overflow-y:auto;}
+    
+    /* ─ Nav ─ */
+    .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;display:flex;background:var(--bg);border-top:1px solid var(--border);z-index:100;}
+    .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px 8px;cursor:pointer;background:none;border:none;color:var(--dim);transition:color .15s;gap:3px;}
+    .nav-item.active{color:var(--gold);}
+    .nav-item svg{width:18px;height:18px;}
+    .nav-label{font-family:var(--ff-m);font-size:9px;letter-spacing:.12em;text-transform:uppercase;}
+    
+    /* ─ Shared ─ */
+    .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+    .section-title{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.28em;text-transform:uppercase;color:var(--dim);}
+    .empty-state{text-align:center;padding:52px 20px;}
+    .empty-state p{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);line-height:2.2;}
+    
+    /* ─ Score Card ─ */
+    .score-card{display:flex;align-items:center;justify-content:space-between;padding:18px;border:1px solid var(--border);margin-bottom:20px;background:var(--bg-s);}
+    .score-label{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.25em;text-transform:uppercase;color:var(--dim);margin-bottom:4px;}
+    .score-value{font-family:var(--ff-d);font-size:var(--2xl);font-weight:300;color:var(--text);line-height:1;}
+    .score-unit{font-family:var(--ff-m);font-size:var(--sm);color:var(--dim);margin-left:2px;}
+    .tier-badge{display:inline-block;padding:2px 8px;border:1px solid currentColor;font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;text-transform:uppercase;margin-top:6px;}
+    .week-mini{display:flex;gap:6px;align-items:flex-end;}
+    .week-day{display:flex;flex-direction:column;align-items:center;gap:4px;}
+    .week-day-label{font-family:var(--ff-m);font-size:8px;color:var(--dim);letter-spacing:.05em;}
+    .week-day.today .week-day-label{color:var(--gold);}
+    .streak-dot{width:8px;height:8px;border-radius:50%;}
+    .streak-dot.done{background:var(--gold);}
+    .streak-dot.missed{background:var(--bg-e);border:1px solid var(--border);}
+    .streak-dot.future{background:transparent;border:1px dashed var(--border);}
+    
+    /* ─ Log Tab ─ */
+    .log-tab{padding:16px 16px 8px;}
+    .goal-item{border:1px solid var(--border);padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:border-color .15s,background .15s;user-select:none;}
+    .goal-item.logged{background:var(--bg-s);}
+    .goal-item:active{background:var(--bg-e);}
+    .goal-virtue-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+    .goal-info{flex:1;min-width:0;}
+    .goal-name{font-family:var(--ff-m);font-size:var(--sm);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .goal-meta{font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.08em;margin-top:2px;}
+    .goal-check{width:20px;height:20px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,border-color .15s;}
+    .goal-check.checked{background:var(--gold);border-color:var(--gold);}
+    .goal-check svg{width:12px;height:12px;stroke:#000;}
+    .quant-input{width:80px;background:var(--bg-e);border:1px solid var(--border);color:var(--text);font-family:var(--ff-m);font-size:var(--sm);padding:4px 8px;text-align:right;outline:none;}
+    .quant-input:focus{border-color:var(--gold-d);}
+    
+    /* ─ Goals Tab ─ */
+    .goals-tab{padding:16px;}
+    .btn-add{width:100%;background:transparent;border:1px solid var(--border);color:var(--mid);font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.22em;text-transform:uppercase;padding:12px;cursor:pointer;margin-bottom:20px;transition:border-color .15s,color .15s;}
+    .btn-add:hover{border-color:var(--gold-d);color:var(--text);}
+    .goal-manage-item{border:1px solid var(--border);padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;}
+    .goal-manage-info{flex:1;min-width:0;}
+    .btn-delete{background:none;border:none;color:var(--dim);cursor:pointer;padding:4px 8px;font-size:20px;line-height:1;transition:color .15s;}
+    .btn-delete:hover{color:#b55;}
+    
+    /* ─ Modal ─ */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:200;display:flex;align-items:flex-end;}
+    .modal{background:var(--bg-s);border-top:1px solid var(--border);width:100%;max-width:480px;margin:0 auto;padding:22px 18px 32px;max-height:85vh;overflow-y:auto;}
+    .modal-title{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:20px;}
+    .form-group{margin-bottom:14px;}
+    .form-label{display:block;font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:5px;}
+    .form-input,.form-select{width:100%;background:var(--bg-e);border:1px solid var(--border);color:var(--text);font-family:var(--ff-m);font-size:var(--sm);padding:9px 11px;outline:none;-webkit-appearance:none;appearance:none;}
+    .form-input:focus,.form-select:focus{border-color:var(--gold-d);}
+    .virtue-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .virtue-btn{padding:9px;border:1px solid var(--border);background:transparent;color:var(--mid);font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+    .virtue-btn.selected{color:#000;}
+    .weight-row{display:flex;gap:6px;}
+    .weight-btn{flex:1;padding:8px;border:1px solid var(--border);background:transparent;color:var(--mid);font-family:var(--ff-m);font-size:var(--xs);cursor:pointer;transition:all .15s;}
+    .weight-btn.selected{background:var(--gold);border-color:var(--gold);color:#000;}
+    .modal-actions{display:flex;gap:8px;margin-top:18px;}
+    .btn-cancel{flex:1;background:transparent;border:1px solid var(--border);color:var(--dim);font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;text-transform:uppercase;padding:11px;cursor:pointer;}
+    .btn-save{flex:2;background:var(--gold);border:1px solid var(--gold);color:#000;font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.2em;text-transform:uppercase;padding:11px;cursor:pointer;}
+    .btn-save:disabled{opacity:.3;cursor:default;}
+    
+    /* ─ Progress Tab ─ */
+    .progress-tab{padding:16px;}
+    .virtue-tree-card{border:1px solid var(--border);padding:14px;margin-bottom:10px;}
+    .virtue-tree-header{display:flex;align-items:center;margin-bottom:8px;}
+    .virtue-tree-name{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.28em;text-transform:uppercase;}
+    .virtue-tree-level{font-family:var(--ff-d);font-size:var(--2xl);font-weight:300;line-height:1;}
+    .virtue-tree-title{font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.15em;margin-bottom:8px;}
+    .progress-track{height:2px;background:var(--bg-e);position:relative;margin-bottom:4px;}
+    .progress-fill{position:absolute;left:0;top:0;height:100%;transition:width .5s ease;}
+    .progress-meta{display:flex;justify-content:space-between;font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.05em;}
+    .level-nodes{display:flex;gap:4px;margin-top:10px;}
+    .level-node{flex:1;height:4px;background:var(--bg-e);border:1px solid var(--border);transition:background .3s;}
+    .level-node.reached{border:none;}
+    .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:20px;}
+    .week-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg-s);gap:2px;}
+    .week-cell.today{border-color:var(--gold-d);}
+    .day-label{font-family:var(--ff-m);font-size:8px;color:var(--dim);letter-spacing:.04em;}
+    .day-score{font-family:var(--ff-m);font-size:10px;}
+    
+    /* ─ Settings ─ */
+    .settings-tab{padding:16px;}
+    .settings-section{margin-bottom:24px;}
+    .settings-section-title{font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    .settings-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #121212;}
+    .settings-label{font-family:var(--ff-m);font-size:var(--sm);color:var(--text);}
+    .toggle{width:38px;height:20px;background:var(--border);border-radius:10px;position:relative;cursor:pointer;transition:background .2s;border:none;padding:0;flex-shrink:0;}
+    .toggle.on{background:var(--gold);}
+    .toggle::after{content:'';position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;}
+    .toggle.on::after{left:21px;}
+    .select-row{display:flex;gap:5px;}
+    .select-chip{padding:4px 9px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:var(--ff-m);font-size:var(--xs);letter-spacing:.1em;cursor:pointer;transition:all .15s;}
+    .select-chip.active{background:var(--gold);border-color:var(--gold);color:#000;}
+    .app-version{font-family:var(--ff-m);font-size:var(--xs);color:var(--dim);letter-spacing:.18em;text-align:center;margin-top:28px;}
+    
+    /* ─ Animations ─ */
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+    .fade-in{animation:fadeIn .35s ease forwards;}
+    @keyframes checkPop{0%{transform:scale(1);}50%{transform:scale(1.25);}100%{transform:scale(1);}}
+    .check-pop{animation:checkPop .2s ease;}
+  `}</style>
+
+  {screen === "focus" ? (
+    <FocusScreen
+      focus={STOIC_CONTENT[focusIdx]}
+      timer={focusTimer}
+      ready={focusReady}
+      reflection={reflection}
+      onReflection={setReflection}
+      onProceed={handleProceed}
+      reflectionEnabled={settings.reflectionEnabled}
+    />
+  ) : (
+    <div className="main-app">
+      <header className="app-header">
+        <span className="app-logo">STOIC</span>
+        <span className="app-date">
+          {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase()}
+        </span>
+      </header>
+      <div className="tab-content">
+        {activeTab === "log"      && <LogTab      goals={goals} logs={logs} onLog={logGoal} />}
+        {activeTab === "goals"    && <GoalsTab    goals={goals} onUpdate={updateGoals} />}
+        {activeTab === "progress" && <ProgressTab goals={goals} logs={logs} virtueXP={virtueXP} />}
+        {activeTab === "settings" && <SettingsTab settings={settings} onUpdate={updateSettings} />}
+      </div>
+      <nav className="bottom-nav">
+        {[
+          { id: "log",      label: "Log",      Icon: LogIcon },
+          { id: "goals",    label: "Goals",    Icon: GoalsIcon },
+          { id: "progress", label: "Progress", Icon: ProgressIcon },
+          { id: "settings", label: "Settings", Icon: SettingsIcon },
+        ].map(({ id, label, Icon }) => (
+          <button key={id} className={`nav-item ${activeTab === id ? "active" : ""}`} onClick={() => setActiveTab(id)}>
+            <Icon />
+            <span className="nav-label">{label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  )}
+</div>
+```
+
+);
+}
