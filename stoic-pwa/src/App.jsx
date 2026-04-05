@@ -76,7 +76,7 @@ function StoicBackground() {
         preserveAspectRatio="xMidYMid slice"
       >
         {/* ── Meander border strip at top ── */}
-        <g opacity="0.1" stroke={gold} fill="none" strokeWidth="0.7">
+        <g opacity="0.100" stroke={gold} fill="none" strokeWidth="0.7">
           <line x1="0" y1="4"  x2="480" y2="4"  strokeWidth="0.4"/>
           <path d={meander}/>
           <line x1="0" y1="28" x2="480" y2="28" strokeWidth="0.4"/>
@@ -103,32 +103,32 @@ function StoicBackground() {
           <path d="M240,418 L249,430 L240,442 L231,430 Z" strokeWidth="0.5"/>
         </g>
 
-        {/* ── Left Doric column ── */}
+        {/* ── Left Doric column — moved inward to avoid SVG boundary clipping ── */}
         <g opacity="0.100" fill={gold}>
           {/* Shaft */}
-          <rect x="6"  y="500" width="20" height="230"/>
+          <rect x="22"  y="500" width="20" height="230"/>
           {/* Base plinth */}
-          <rect x="1"  y="728" width="30" height="6"/>
-          <rect x="-2" y="733" width="36" height="5"/>
+          <rect x="17"  y="728" width="30" height="6"/>
+          <rect x="14"  y="733" width="36" height="5"/>
           {/* Capital echinus */}
-          <rect x="1"  y="492" width="30" height="8"/>
-          <rect x="-2" y="484" width="36" height="10"/>
-          {/* Subtle fluting (dark lines carved into the column) */}
-          <rect x="11" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
-          <rect x="16" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
-          <rect x="21" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="17"  y="492" width="30" height="8"/>
+          <rect x="14"  y="484" width="36" height="10"/>
+          {/* Fluting */}
+          <rect x="27"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="32"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="37"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
         </g>
 
-        {/* ── Right Doric column ── */}
+        {/* ── Right Doric column — moved inward symmetrically ── */}
         <g opacity="0.100" fill={gold}>
-          <rect x="454" y="500" width="20" height="230"/>
-          <rect x="449" y="728" width="30" height="6"/>
-          <rect x="446" y="733" width="36" height="5"/>
-          <rect x="449" y="492" width="30" height="8"/>
-          <rect x="446" y="484" width="36" height="10"/>
-          <rect x="459" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
-          <rect x="464" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
-          <rect x="469" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="438" y="500" width="20" height="230"/>
+          <rect x="433" y="728" width="30" height="6"/>
+          <rect x="430" y="733" width="36" height="5"/>
+          <rect x="433" y="492" width="30" height="8"/>
+          <rect x="430" y="484" width="36" height="10"/>
+          <rect x="443" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="448" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="453" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
         </g>
 
         {/* ── ΛΟΓΟΣ watermark (Logos — Stoic universal reason) ── */}

@@ -517,25 +517,22 @@ body {
   background: rgba(0,0,0,.92);
   z-index: 200;
   display: flex;
-  align-items: flex-end;
-  /* Pad top so modal never covers the full screen on small devices */
-  padding-top: max(var(--sat), 48px);
+  /* Full-screen modal: anchored to top so keyboard pushes content up naturally */
+  align-items: flex-start;
 }
 .modal {
   background: var(--bg-s);
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  padding: 20px 16px calc(var(--sab) + 20px);
-  /* dvh shrinks when the iOS soft keyboard appears — prevents content clipping.
-     88vh is the fallback for older browsers that don't support dvh. */
-  max-height: 88vh;
-  max-height: 92dvh;
+  /* Top padding respects notch; bottom padding clears home bar */
+  padding: calc(var(--sat) + 16px) 16px calc(var(--sab) + 24px);
+  /* Full dynamic viewport height — scrolls all fields, keyboard can't clip */
+  height: 100dvh;
+  height: 100vh; /* fallback */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* Tighten form spacing so more fields fit on small screens */
-  --form-gap: 11px;
 }
 .modal-title {
   font-size: var(--fs-xs);
