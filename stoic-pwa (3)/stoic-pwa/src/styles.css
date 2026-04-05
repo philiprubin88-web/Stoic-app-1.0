@@ -1,4 +1,31 @@
-/* ─── Reset ──────────────────────────────────────────────────────────────── */
+/* ─── Stoic Background ───────────────────────────────────────────────────── */
+.stoic-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* All direct interactive children of main-app sit above the background */
+.main-app > .app-header,
+.main-app > .tab-content,
+.main-app > .bottom-nav {
+  position: relative;
+  z-index: 1;
+}
+
+/* Focus screen background layer */
+.focus-screen .stoic-bg {
+  position: fixed;
+  z-index: 0;
+}
+.focus-screen > *:not(.stoic-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Reset ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -245,6 +272,7 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 .app-header {
@@ -486,10 +514,12 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.9);
+  background: rgba(0,0,0,.92);
   z-index: 200;
   display: flex;
   align-items: flex-end;
+  /* Pad top so modal never covers the full screen on small devices */
+  padding-top: max(var(--sat), 48px);
 }
 .modal {
   background: var(--bg-s);
@@ -497,10 +527,15 @@ body {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  padding: 20px 16px calc(var(--sab) + 24px);
+  padding: 20px 16px calc(var(--sab) + 20px);
+  /* dvh shrinks when the iOS soft keyboard appears — prevents content clipping.
+     88vh is the fallback for older browsers that don't support dvh. */
   max-height: 88vh;
+  max-height: 92dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Tighten form spacing so more fields fit on small screens */
+  --form-gap: 11px;
 }
 .modal-title {
   font-size: var(--fs-xs);
@@ -510,7 +545,7 @@ body {
   margin-bottom: 18px;
 }
 
-.form-group  { margin-bottom: 14px; }
+.form-group  { margin-bottom: var(--form-gap, 14px); }
 .form-label  {
   display: block;
   font-size: var(--fs-xs);
