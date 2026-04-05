@@ -1,14 +1,21 @@
-async function storageGet(key, def) {
+/**
+ * Storage — pure localStorage.
+ * Works in all browsers, Safari PWA, and installed home screen apps.
+ */
+
+export function storageGet(key, defaultValue) {
   try {
-    const value = localStorage.getItem(key);
-    return value ? JSON.parse(value) : def;
+    const raw = localStorage.getItem(key)
+    return raw !== null ? JSON.parse(raw) : defaultValue
   } catch {
-    return def;
+    return defaultValue
   }
 }
 
-async function storageSet(key, val) {
+export function storageSet(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(val));
-  } catch {}
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (err) {
+    console.error('[STOIC] storageSet failed:', err)
+  }
 }
