@@ -83,7 +83,7 @@ function StoicBackground() {
         </g>
 
         {/* ── Cosmic wheel / Logos ── */}
-        <g opacity="0.052" stroke={gold} fill="none">
+        <g opacity="0.200" stroke={gold} fill="none">
           {/* Concentric rings */}
           <circle cx="240" cy="430" r="282" strokeWidth="0.7"/>
           <circle cx="240" cy="430" r="204" strokeWidth="0.5"/>
@@ -104,7 +104,7 @@ function StoicBackground() {
         </g>
 
         {/* ── Left Doric column ── */}
-        <g opacity="0.045" fill={gold}>
+        <g opacity="0.200" fill={gold}>
           {/* Shaft */}
           <rect x="6"  y="500" width="20" height="230"/>
           {/* Base plinth */}
@@ -136,7 +136,7 @@ function StoicBackground() {
           x="240" y="442"
           textAnchor="middle"
           fill={gold}
-          opacity="0.022"
+          opacity="0.200"
           fontSize="64"
           letterSpacing="24"
           fontFamily="Georgia, serif"
