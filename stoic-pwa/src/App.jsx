@@ -76,14 +76,14 @@ function StoicBackground() {
         preserveAspectRatio="xMidYMid slice"
       >
         {/* ── Meander border strip at top ── */}
-        <g opacity="0.07" stroke={gold} fill="none" strokeWidth="0.7">
+        <g opacity="0.1" stroke={gold} fill="none" strokeWidth="0.7">
           <line x1="0" y1="4"  x2="480" y2="4"  strokeWidth="0.4"/>
           <path d={meander}/>
           <line x1="0" y1="28" x2="480" y2="28" strokeWidth="0.4"/>
         </g>
 
         {/* ── Cosmic wheel / Logos ── */}
-        <g opacity="0.200" stroke={gold} fill="none">
+        <g opacity="0.100" stroke={gold} fill="none">
           {/* Concentric rings */}
           <circle cx="240" cy="430" r="282" strokeWidth="0.7"/>
           <circle cx="240" cy="430" r="204" strokeWidth="0.5"/>
@@ -104,7 +104,7 @@ function StoicBackground() {
         </g>
 
         {/* ── Left Doric column ── */}
-        <g opacity="0.200" fill={gold}>
+        <g opacity="0.100" fill={gold}>
           {/* Shaft */}
           <rect x="6"  y="500" width="20" height="230"/>
           {/* Base plinth */}
@@ -120,7 +120,7 @@ function StoicBackground() {
         </g>
 
         {/* ── Right Doric column ── */}
-        <g opacity="0.045" fill={gold}>
+        <g opacity="0.100" fill={gold}>
           <rect x="454" y="500" width="20" height="230"/>
           <rect x="449" y="728" width="30" height="6"/>
           <rect x="446" y="733" width="36" height="5"/>
@@ -136,7 +136,7 @@ function StoicBackground() {
           x="240" y="442"
           textAnchor="middle"
           fill={gold}
-          opacity="0.200"
+          opacity="0.100"
           fontSize="64"
           letterSpacing="24"
           fontFamily="Georgia, serif"
