@@ -39,12 +39,122 @@ const CheckIcon = () => (
   </svg>
 )
 
+// ─── Stoic Background ────────────────────────────────────────────────────────
+// Subtle symbolic imagery: cosmic wheel (Logos), Roman columns, meander border.
+// Opacity kept very low so it reads as atmosphere, not decoration.
+
+function StoicBackground() {
+  const gold = '#c9a84c'
+  // Pre-compute compass tick endpoints at 8 positions on the outer ring
+  const ticks = Array.from({ length: 8 }, (_, i) => {
+    const angle = (i * 45 * Math.PI) / 180
+    const cx = 240, cy = 430
+    return {
+      x1: cx + 272 * Math.sin(angle),
+      y1: cy - 272 * Math.cos(angle),
+      x2: cx + 284 * Math.sin(angle),
+      y2: cy - 284 * Math.cos(angle),
+    }
+  })
+  // One unit of Greek meander (key) pattern — repeated across top border
+  const meander = Array.from({ length: 26 }, (_, i) => {
+    const x = i * 18 - 2
+    const y = 14
+    const s = 6
+    // Alternating meander step direction for classic key pattern
+    return i % 2 === 0
+      ? `M${x},${y+s} L${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s}`
+      : `M${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s} L${x+2*s},${y}`
+  }).join(' ')
+
+  return (
+    <div className="stoic-bg" aria-hidden="true">
+      <svg
+        width="100%" height="100%"
+        viewBox="0 0 480 860"
+        xmlns="http://www.w3.org/2000/svg"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        {/* ── Meander border strip at top ── */}
+        <g opacity="0.07" stroke={gold} fill="none" strokeWidth="0.7">
+          <line x1="0" y1="4"  x2="480" y2="4"  strokeWidth="0.4"/>
+          <path d={meander}/>
+          <line x1="0" y1="28" x2="480" y2="28" strokeWidth="0.4"/>
+        </g>
+
+        {/* ── Cosmic wheel / Logos ── */}
+        <g opacity="0.052" stroke={gold} fill="none">
+          {/* Concentric rings */}
+          <circle cx="240" cy="430" r="282" strokeWidth="0.7"/>
+          <circle cx="240" cy="430" r="204" strokeWidth="0.5"/>
+          <circle cx="240" cy="430" r="126" strokeWidth="0.45"/>
+          <circle cx="240" cy="430" r="48"  strokeWidth="0.45"/>
+          {/* Cardinal cross */}
+          <line x1="240" y1="100" x2="240" y2="760" strokeWidth="0.4"/>
+          <line x1="-60" y1="430" x2="540" y2="430" strokeWidth="0.4"/>
+          {/* Diagonal axes */}
+          <line x1="40"  y1="190" x2="440" y2="670" strokeWidth="0.25"/>
+          <line x1="440" y1="190" x2="40"  y2="670" strokeWidth="0.25"/>
+          {/* Compass tick marks on outer ring */}
+          {ticks.map((t, i) => (
+            <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} strokeWidth="1.8"/>
+          ))}
+          {/* Small center diamond */}
+          <path d="M240,418 L249,430 L240,442 L231,430 Z" strokeWidth="0.5"/>
+        </g>
+
+        {/* ── Left Doric column ── */}
+        <g opacity="0.045" fill={gold}>
+          {/* Shaft */}
+          <rect x="6"  y="500" width="20" height="230"/>
+          {/* Base plinth */}
+          <rect x="1"  y="728" width="30" height="6"/>
+          <rect x="-2" y="733" width="36" height="5"/>
+          {/* Capital echinus */}
+          <rect x="1"  y="492" width="30" height="8"/>
+          <rect x="-2" y="484" width="36" height="10"/>
+          {/* Subtle fluting (dark lines carved into the column) */}
+          <rect x="11" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="16" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="21" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+        </g>
+
+        {/* ── Right Doric column ── */}
+        <g opacity="0.045" fill={gold}>
+          <rect x="454" y="500" width="20" height="230"/>
+          <rect x="449" y="728" width="30" height="6"/>
+          <rect x="446" y="733" width="36" height="5"/>
+          <rect x="449" y="492" width="30" height="8"/>
+          <rect x="446" y="484" width="36" height="10"/>
+          <rect x="459" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="464" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+          <rect x="469" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
+        </g>
+
+        {/* ── ΛΟΓΟΣ watermark (Logos — Stoic universal reason) ── */}
+        <text
+          x="240" y="442"
+          textAnchor="middle"
+          fill={gold}
+          opacity="0.022"
+          fontSize="64"
+          letterSpacing="24"
+          fontFamily="Georgia, serif"
+          fontStyle="italic"
+          fontWeight="300"
+        >ΛΟΓΟΣ</text>
+      </svg>
+    </div>
+  )
+}
+
 // ─── Focus Screen ─────────────────────────────────────────────────────────────
 
 function FocusScreen({ focus, timer, ready, reflection, onReflection, onProceed, reflectionEnabled }) {
   const pct = ((12 - timer) / 12) * 100
   return (
     <div className="focus-screen fade-in">
+      <StoicBackground />
       <div className="focus-bg-glow" />
       <div className="focus-label">
         Daily Focus · {new Date().toLocaleDateString('en-GB', {
@@ -636,6 +746,7 @@ export default function App() {
         />
       ) : (
         <div className="main-app">
+          <StoicBackground />
           <header className="app-header">
             <span className="app-logo">STOIC</span>
             <span className="app-date">
