@@ -40,11 +40,13 @@
   --bg-s:       #111111;
   --bg-e:       #1a1a1a;
   --text:       #e0d8cc;
-  --text-dim:   #908880;
   --dim:        #55504a;
-  --mid:        #908880;
+  --mid:        #908880;   /* medium-dim text; same value as removed --text-dim */
   --gold:       #c9a84c;
   --gold-d:     #5a4818;
+  /* Virtue accent colours — these mirror the values in constants.js.
+     They are defined here for documentation and potential future CSS use,
+     but all direct colour application currently goes through JS inline styles. */
   --green:      #7BA08A;
   --blue:       #7a95a8;
   --rust:       #b57a6e;
@@ -65,14 +67,9 @@
   /* Touch target minimum (Apple HIG = 44pt) */
   --touch-min: 44px;
 
-  /* Safe areas for notch / home bar */
+  /* Safe-area insets — only top and bottom are needed; left/right are unused. */
   --sat: env(safe-area-inset-top,    0px);
-  --sar: env(safe-area-inset-right,  0px);
   --sab: env(safe-area-inset-bottom, 0px);
-  --sal: env(safe-area-inset-left,   0px);
-
-  /* Nav height */
-  --nav-h: calc(62px + var(--sab));
 }
 
 /* Text size overrides */
@@ -208,15 +205,15 @@ body {
   border-radius: 0;
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: var(--fs-base);
+  /* 16px minimum prevents iOS auto-zoom on input focus.
+     max() ensures we never go below 16px even if --fs-sm is smaller. */
+  font-size: max(16px, var(--fs-sm));
   padding: 12px 14px;
   resize: none;
   outline: none;
   margin-bottom: 20px;
   height: 60px;
   line-height: 1.6;
-  /* iOS: prevent zoom on focus */
-  font-size: max(16px, var(--fs-sm));
 }
 .focus-reflection::placeholder { color: var(--dim); }
 .focus-reflection:focus         { border-color: var(--gold-d); }
@@ -528,9 +525,13 @@ body {
   margin: 0 auto;
   /* Top padding respects notch; bottom padding clears home bar */
   padding: calc(var(--sat) + 16px) 16px calc(var(--sab) + 24px);
-  /* Full dynamic viewport height — scrolls all fields, keyboard can't clip */
+  /* 100vh is the fallback for browsers without dvh support.
+     100dvh (dynamic viewport height) overrides it where supported:
+     it shrinks when the iOS soft keyboard appears, so the modal always
+     fits the visible area. The fallback must be declared FIRST so the
+     dvh value wins on capable browsers via cascade order. */
+  height: 100vh;
   height: 100dvh;
-  height: 100vh; /* fallback */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
