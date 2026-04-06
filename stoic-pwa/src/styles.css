@@ -3,26 +3,30 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: 0;   /* explicit 0 → painted at the positioned-element layer */
   overflow: hidden;
 }
 
-/* All direct interactive children of main-app sit above the background */
+/* main-app children must be positioned so they paint at the same z-index:auto
+   layer as stoic-bg, but AFTER it in DOM order (= in front of it).
+   CRITICAL: No explicit z-index here. If we add z-index, these elements become
+   stacking contexts and the fixed-position modal inside tab-content can no
+   longer escape them — it would be trapped at z-index 200 *within* tab-content's
+   stacking context, unable to paint above bottom-nav's stacking context. */
 .main-app > .app-header,
 .main-app > .tab-content,
 .main-app > .bottom-nav {
   position: relative;
-  z-index: 1;
 }
 
-/* Focus screen background layer */
+/* Focus screen: stoic-bg uses fixed so it doesn't scroll with the content.
+   Other children need position:relative (no z-index) so they also land in the
+   positioned-element paint layer and render after stoic-bg in DOM order. */
 .focus-screen .stoic-bg {
   position: fixed;
-  z-index: 0;
 }
 .focus-screen > *:not(.stoic-bg) {
   position: relative;
-  z-index: 1;
 }
 
 /* ─── Reset ───────────────────────────────────────────────────────────────── */
@@ -780,4 +784,130 @@ body {
   text-align: center;
   margin-top: 32px;
   padding-bottom: 8px;
+}
+
+/* ─── Frequency Selector (Add Goal Modal) ────────────────────────────────── */
+/* 3-column grid for the 5 frequency mode buttons */
+.freq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.freq-btn {
+  padding: 10px 4px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-appearance: none;
+  border-radius: 0;
+  text-align: center;
+  line-height: 1.3;
+}
+.freq-btn.selected { background: var(--gold); border-color: var(--gold); color: #000; }
+.freq-btn:active   { opacity: .7; }
+
+/* Row shown when a variable-count frequency mode is selected */
+.freq-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-e);
+}
+.freq-detail-label {
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* +/− stepper for selecting the count or interval number */
+.freq-stepper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.freq-stepper-btn {
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-appearance: none;
+  border-radius: 0;
+  transition: border-color .15s;
+}
+.freq-stepper-btn:active { border-color: var(--gold-d); }
+.freq-stepper-val {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--gold);
+  min-width: 28px;
+  text-align: center;
+}
+
+/* ─── Noted Goals — Log Input ────────────────────────────────────────────── */
+/* Text input for logging a short note against a 'noted' goal */
+.note-log-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-e);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  /* 16px minimum prevents iOS auto-zoom */
+  font-size: max(16px, var(--fs-xs));
+  padding: 6px 10px;
+  outline: none;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.note-log-input:focus         { border-color: var(--gold-d); }
+.note-log-input::placeholder  { color: var(--dim); }
+
+/* ─── Reflections Journal (Progress Tab) ─────────────────────────────────── */
+/* Shows all logged notes for 'noted' goals over the past 30 days */
+.note-journal { margin-bottom: 24px; }
+
+.note-entry {
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  background: var(--bg-s);
+}
+.note-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.note-entry-goal {
+  font-size: var(--fs-xs);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.note-entry-date {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .1em;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.note-entry-text {
+  font-size: var(--fs-sm);
+  color: var(--text);
+  line-height: 1.7;
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import './styles.css'
 import { VIRTUES, STOIC_CONTENT, VIRTUE_LEVELS } from './constants.js'
-import { todayStr, getWeekDates, getVirtueLevel, calcWeeklyScore, getTier, uid } from './utils.js'
+import { todayStr, getWeekDates, getVirtueLevel, calcWeeklyScore, getTier, uid, freqLabel } from './utils.js'
 import { storageGet, storageSet } from './storage.js'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -236,26 +236,43 @@ function LogTab({ goals, logs, onLog }) {
     const virtue = VIRTUES[goal.virtue] || VIRTUES.courage
     const logged = todayLogs[goal.id]
     const isAnim = animIds.includes(goal.id)
+
+    // Noted and quantitative goals have their own inputs — block the tap() toggle
+    const isInteractiveInput = goal.type === 'quantitative' || goal.type === 'noted'
+
     return (
       <div key={goal.id}
         className={`goal-item ${logged ? 'logged' : ''}`}
-        onClick={() => goal.type !== 'quantitative' && tap(goal.id)}
+        onClick={() => !isInteractiveInput && tap(goal.id)}
       >
         <div className="goal-virtue-dot" style={{ background: virtue.color }} />
         <div className="goal-info">
           <div className="goal-name">{goal.name}</div>
           <div className="goal-meta">
-            {virtue.label.toUpperCase()} · {(goal.type || 'binary').toUpperCase()}
+            {virtue.label.toUpperCase()} · {(goal.type || 'binary').toUpperCase()} · {freqLabel(goal).toUpperCase()}
             {goal.type === 'quantitative' && goal.target_value
               ? ` · ${goal.target_value}${goal.unit ? ' ' + goal.unit : ''}`
               : ''}
           </div>
         </div>
+
         {goal.type === 'quantitative' ? (
           <input className="quant-input" type="number" inputMode="decimal"
             placeholder="0" value={logged || ''}
             onClick={e => e.stopPropagation()}
             onChange={e => onLog(goal.id, e.target.value)} />
+
+        ) : goal.type === 'noted' ? (
+          // Text input for noted goals — user logs what they actually did
+          <input
+            className="note-log-input"
+            type="text"
+            placeholder="Log it…"
+            value={typeof logged === 'string' ? logged : ''}
+            onClick={e => e.stopPropagation()}
+            // Treat an empty input as 0 (falsy) so it doesn't count as logged
+            onChange={e => onLog(goal.id, e.target.value || 0)}
+          />
         ) : (
           <div className={`goal-check ${logged ? 'checked' : ''} ${isAnim ? 'check-pop' : ''}`}>
             {logged ? <CheckIcon /> : null}
@@ -265,8 +282,14 @@ function LogTab({ goals, logs, onLog }) {
     )
   }
 
-  const daily    = goals.filter(g => !g.timeframe || g.timeframe === 'daily' || g.timeframe === 'weekly')
-  const longTerm = goals.filter(g => g.timeframe === 'monthly' || g.timeframe === 'yearly')
+  // 'weekly_x' goals appear in the daily section — logged day-by-day even
+  // though scoring counts total completions against a per-week target.
+  const daily    = goals.filter(g =>
+    !g.timeframe || g.timeframe === 'daily' || g.timeframe === 'weekly' || g.timeframe === 'weekly_x'
+  )
+  const longTerm = goals.filter(g =>
+    g.timeframe === 'monthly' || g.timeframe === 'yearly' || g.timeframe === 'every_x_weeks'
+  )
 
   // Count completions only for goals that still exist. Log entries for deleted
   // goals persist in localStorage (intentional — preserves history), so we
@@ -337,24 +360,58 @@ function LogTab({ goals, logs, onLog }) {
 }
 
 // ─── Add Goal Modal ───────────────────────────────────────────────────────────
+// Full-screen modal (see CSS) to avoid keyboard clipping on small devices.
+// Frequency modes:
+//   'daily'         — every day (existing daily goals)
+//   'weekly_x'      — X times per week; freq_count stores X
+//   'every_x_weeks' — once every N weeks; freq_every stores N (long-term)
+//   'monthly'       — once a month (long-term)
+//   'yearly'        — once a year (long-term)
+
+// Frequency mode options shown as chip buttons
+const FREQ_MODES = [
+  { val: 'daily',          label: 'Every\nday' },
+  { val: 'weekly_x',       label: '×\u2009/\u2009week' },   // narrow-space "× / week"
+  { val: 'every_x_weeks',  label: 'Every\nN wks' },
+  { val: 'monthly',        label: 'Monthly' },
+  { val: 'yearly',         label: 'Yearly' },
+]
 
 function AddGoalModal({ onSave, onClose }) {
   const [form, setForm] = useState({
-    name: '', type: 'binary', virtue: '', timeframe: 'daily', weight: 2, target_value: '', unit: ''
+    name:         '',
+    type:         'binary',
+    virtue:       '',
+    timeframe:    'daily',
+    freq_count:   3,   // used when timeframe === 'weekly_x'
+    freq_every:   2,   // used when timeframe === 'every_x_weeks'
+    weight:       2,
+    target_value: '',
+    unit:         '',
   })
+
+  const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
   const valid = form.name.trim() && form.virtue
+
+  // Clamp helpers for the +/− steppers
+  const stepFreqCount = (delta) =>
+    set('freq_count', Math.min(7, Math.max(1, (form.freq_count || 3) + delta)))
+  const stepFreqEvery = (delta) =>
+    set('freq_every', Math.min(52, Math.max(2, (form.freq_every || 2) + delta)))
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">New Goal</div>
 
+        {/* ── Goal name ── */}
         <div className="form-group">
           <label className="form-label">Goal Name</label>
           <input className="form-input" placeholder="e.g. Gym session"
-            value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+            value={form.name} onChange={e => set('name', e.target.value)} />
         </div>
 
+        {/* ── Virtue ── */}
         <div className="form-group">
           <label className="form-label">Virtue</label>
           <div className="virtue-grid">
@@ -364,57 +421,87 @@ function AddGoalModal({ onSave, onClose }) {
                 style={form.virtue === key
                   ? { background: v.color, borderColor: v.color }
                   : { borderColor: v.dim }}
-                onClick={() => setForm(p => ({ ...p, virtue: key }))}>
+                onClick={() => set('virtue', key)}>
                 {v.label}
               </button>
             ))}
           </div>
         </div>
 
+        {/* ── Goal type ── */}
         <div className="form-group">
           <label className="form-label">Type</label>
           <select className="form-select" value={form.type}
-            onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+            onChange={e => set('type', e.target.value)}>
             <option value="binary">Binary (done / not done)</option>
             <option value="quantitative">Quantitative (numeric target)</option>
             <option value="streak">Streak (daily chain)</option>
+            <option value="noted">Noted (log what you did)</option>
           </select>
         </div>
 
+        {/* ── Quantitative target — only when type is quantitative ── */}
         {form.type === 'quantitative' && (
           <div className="form-group">
             <label className="form-label">Target Value</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input className="form-input" type="number" inputMode="decimal"
                 placeholder="e.g. 10000" value={form.target_value}
-                onChange={e => setForm(p => ({ ...p, target_value: e.target.value }))}
+                onChange={e => set('target_value', e.target.value)}
                 style={{ flex: 2 }} />
               <input className="form-input" placeholder="unit"
-                value={form.unit}
-                onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
+                value={form.unit} onChange={e => set('unit', e.target.value)}
                 style={{ flex: 1 }} />
             </div>
           </div>
         )}
 
+        {/* ── Frequency ── */}
         <div className="form-group">
-          <label className="form-label">Timeframe</label>
-          <select className="form-select" value={form.timeframe}
-            onChange={e => setForm(p => ({ ...p, timeframe: e.target.value }))}>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
+          <label className="form-label">Frequency</label>
+          <div className="freq-grid">
+            {FREQ_MODES.map(({ val, label }) => (
+              <button key={val}
+                className={`freq-btn ${form.timeframe === val ? 'selected' : ''}`}
+                onClick={() => set('timeframe', val)}
+                // Render newlines in labels (e.g. "Every\nday" → two lines)
+                style={{ whiteSpace: 'pre-line' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Show stepper when a variable frequency is selected */}
+          {form.timeframe === 'weekly_x' && (
+            <div className="freq-detail">
+              <span className="freq-detail-label">Times per week</span>
+              <div className="freq-stepper">
+                <button className="freq-stepper-btn" onClick={() => stepFreqCount(-1)}>−</button>
+                <span className="freq-stepper-val">{form.freq_count}</span>
+                <button className="freq-stepper-btn" onClick={() => stepFreqCount(+1)}>+</button>
+              </div>
+            </div>
+          )}
+          {form.timeframe === 'every_x_weeks' && (
+            <div className="freq-detail">
+              <span className="freq-detail-label">Every N weeks</span>
+              <div className="freq-stepper">
+                <button className="freq-stepper-btn" onClick={() => stepFreqEvery(-1)}>−</button>
+                <span className="freq-stepper-val">{form.freq_every}</span>
+                <button className="freq-stepper-btn" onClick={() => stepFreqEvery(+1)}>+</button>
+              </div>
+            </div>
+          )}
         </div>
 
+        {/* ── Importance weight ── */}
         <div className="form-group">
           <label className="form-label">Importance (1 – 5)</label>
           <div className="weight-row">
             {[1,2,3,4,5].map(w => (
               <button key={w}
                 className={`weight-btn ${form.weight === w ? 'selected' : ''}`}
-                onClick={() => setForm(p => ({ ...p, weight: w }))}>
+                onClick={() => set('weight', w)}>
                 {w}
               </button>
             ))}
@@ -466,7 +553,7 @@ function GoalsTab({ goals, onUpdate }) {
                 <div className="goal-manage-info">
                   <div className="goal-name">{goal.name}</div>
                   <div className="goal-meta">
-                    {(goal.type || 'binary').toUpperCase()} · {(goal.timeframe || 'daily').toUpperCase()} · WT {goal.weight}
+                    {(goal.type || 'binary').toUpperCase()} · {freqLabel(goal).toUpperCase()} · WT {goal.weight}
                     {goal.type === 'quantitative' && goal.target_value
                       ? ` · ${goal.target_value}${goal.unit ? ' ' + goal.unit : ''}`
                       : ''}
@@ -529,6 +616,59 @@ function VirtueTree({ virtue, xp, goals, logs }) {
           />
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Note Journal ─────────────────────────────────────────────────────────────
+// Shown in the Progress tab when any 'noted' goals exist.
+// Displays the last 30 days of logged notes in reverse-chronological order.
+
+function NoteJournal({ goals, logs }) {
+  // Collect all note entries from the past 30 days
+  const entries = []
+  for (let i = 0; i < 30; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const date    = d.toISOString().split('T')[0]
+    const dayLogs = logs[date] || {}
+    goals.forEach(goal => {
+      const note = dayLogs[goal.id]
+      // Only include non-empty string values (noted goals store strings)
+      if (note && typeof note === 'string' && note.trim()) {
+        entries.push({ date, goal, note })
+      }
+    })
+  }
+
+  if (!entries.length) {
+    return (
+      <div className="empty-state" style={{ padding: '24px 20px' }}>
+        <p>No reflections logged yet.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="note-journal">
+      {entries.map((e, i) => {
+        const virtue = VIRTUES[e.goal.virtue] || VIRTUES.courage
+        // Append T00:00:00 to prevent timezone shifting the date back one day
+        const displayDate = new Date(e.date + 'T00:00:00').toLocaleDateString('en-GB', {
+          day: 'numeric', month: 'short'
+        })
+        return (
+          <div key={i} className="note-entry">
+            <div className="note-entry-header">
+              <span className="note-entry-goal" style={{ color: virtue.color }}>
+                {e.goal.name}
+              </span>
+              <span className="note-entry-date">{displayDate}</span>
+            </div>
+            <p className="note-entry-text">{e.note}</p>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -611,6 +751,20 @@ function ProgressTab({ goals, logs, virtueXP }) {
       {Object.keys(VIRTUES).map(v => (
         <VirtueTree key={v} virtue={v} xp={virtueXP[v] || 0} goals={goals} logs={logs} />
       ))}
+
+      {/* Reflections journal — only shown when there are 'noted' type goals */}
+      {goals.some(g => g.type === 'noted') && (
+        <>
+          <div className="section-header" style={{ marginTop: 24 }}>
+            <span className="section-title">Reflections Journal</span>
+            <span className="section-title">30 days</span>
+          </div>
+          <NoteJournal
+            goals={goals.filter(g => g.type === 'noted')}
+            logs={logs}
+          />
+        </>
+      )}
     </div>
   )
 }
