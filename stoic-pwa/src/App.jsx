@@ -39,34 +39,54 @@ const CheckIcon = () => (
   </svg>
 )
 
+// ─── Module-level constants ───────────────────────────────────────────────────
+// These never change and are hoisted here to avoid recomputation on re-renders.
+
+// Duration in seconds the user must view the daily focus before proceeding.
+const FOCUS_TIMER_SECONDS = 12
+
+// Static nav tab definitions — icons are stable component references.
+const NAV_TABS = [
+  { id: 'log',      label: 'Log',      Icon: LogIcon },
+  { id: 'goals',    label: 'Goals',    Icon: GoalsIcon },
+  { id: 'progress', label: 'Progress', Icon: ProgressIcon },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
+]
+
+// ─── StoicBackground pre-computed geometry ────────────────────────────────────
+// Compass tick endpoints: 8 evenly-spaced points on the outer ring of the
+// cosmic wheel, each tick spanning from r=272 to r=284 in the SVG coordinate
+// space (viewBox 0 0 480 860, wheel centred at 240,430).
+const BACKGROUND_TICKS = Array.from({ length: 8 }, (_, i) => {
+  const angle = (i * 45 * Math.PI) / 180
+  const cx = 240, cy = 430
+  return {
+    x1: cx + 272 * Math.sin(angle),
+    y1: cy - 272 * Math.cos(angle),
+    x2: cx + 284 * Math.sin(angle),
+    y2: cy - 284 * Math.cos(angle),
+  }
+})
+
+// Greek meander (key) border pattern rendered as a single SVG path string.
+// Alternating step directions create the classic interlocking key motif.
+// 26 units × 18px stride covers the full 480px viewBox width.
+const BACKGROUND_MEANDER = Array.from({ length: 26 }, (_, i) => {
+  const x = i * 18 - 2
+  const y = 14
+  const s = 6   // step size in px
+  return i % 2 === 0
+    ? `M${x},${y+s} L${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s}`
+    : `M${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s} L${x+2*s},${y}`
+}).join(' ')
+
 // ─── Stoic Background ────────────────────────────────────────────────────────
-// Subtle symbolic imagery: cosmic wheel (Logos), Roman columns, meander border.
-// Opacity kept very low so it reads as atmosphere, not decoration.
+// Purely decorative SVG layer rendered behind all tab content and the focus
+// screen. Uses pre-computed module-level constants so it never recomputes
+// geometry on re-renders. aria-hidden keeps it invisible to screen readers.
 
 function StoicBackground() {
   const gold = '#c9a84c'
-  // Pre-compute compass tick endpoints at 8 positions on the outer ring
-  const ticks = Array.from({ length: 8 }, (_, i) => {
-    const angle = (i * 45 * Math.PI) / 180
-    const cx = 240, cy = 430
-    return {
-      x1: cx + 272 * Math.sin(angle),
-      y1: cy - 272 * Math.cos(angle),
-      x2: cx + 284 * Math.sin(angle),
-      y2: cy - 284 * Math.cos(angle),
-    }
-  })
-  // One unit of Greek meander (key) pattern — repeated across top border
-  const meander = Array.from({ length: 26 }, (_, i) => {
-    const x = i * 18 - 2
-    const y = 14
-    const s = 6
-    // Alternating meander step direction for classic key pattern
-    return i % 2 === 0
-      ? `M${x},${y+s} L${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s}`
-      : `M${x},${y} L${x+s},${y} L${x+s},${y+s} L${x+2*s},${y+s} L${x+2*s},${y}`
-  }).join(' ')
-
   return (
     <div className="stoic-bg" aria-hidden="true">
       <svg
@@ -78,13 +98,12 @@ function StoicBackground() {
         {/* ── Meander border strip at top ── */}
         <g opacity="0.100" stroke={gold} fill="none" strokeWidth="0.7">
           <line x1="0" y1="4"  x2="480" y2="4"  strokeWidth="0.4"/>
-          <path d={meander}/>
+          <path d={BACKGROUND_MEANDER}/>
           <line x1="0" y1="28" x2="480" y2="28" strokeWidth="0.4"/>
         </g>
 
-        {/* ── Cosmic wheel / Logos ── */}
+        {/* ── Cosmic wheel (Logos) — concentric rings + axes + compass marks ── */}
         <g opacity="0.100" stroke={gold} fill="none">
-          {/* Concentric rings */}
           <circle cx="240" cy="430" r="282" strokeWidth="0.7"/>
           <circle cx="240" cy="430" r="204" strokeWidth="0.5"/>
           <circle cx="240" cy="430" r="126" strokeWidth="0.45"/>
@@ -95,31 +114,31 @@ function StoicBackground() {
           {/* Diagonal axes */}
           <line x1="40"  y1="190" x2="440" y2="670" strokeWidth="0.25"/>
           <line x1="440" y1="190" x2="40"  y2="670" strokeWidth="0.25"/>
-          {/* Compass tick marks on outer ring */}
-          {ticks.map((t, i) => (
+          {/* Compass tick marks — 8 positions pre-computed at module load */}
+          {BACKGROUND_TICKS.map((t, i) => (
             <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} strokeWidth="1.8"/>
           ))}
-          {/* Small center diamond */}
+          {/* Centre diamond */}
           <path d="M240,418 L249,430 L240,442 L231,430 Z" strokeWidth="0.5"/>
         </g>
 
-        {/* ── Left Doric column — moved inward to avoid SVG boundary clipping ── */}
+        {/* ── Left Doric column ── */}
+        {/* Shaft starts at y=500 and spans 230px down; capital sits above, plinth below.
+            Positioned at x=22 (not x=0) to avoid clipping at the SVG viewBox boundary
+            when the SVG is scaled to fill a screen narrower than 480px. */}
         <g opacity="0.100" fill={gold}>
-          {/* Shaft */}
-          <rect x="22"  y="500" width="20" height="230"/>
-          {/* Base plinth */}
-          <rect x="17"  y="728" width="30" height="6"/>
-          <rect x="14"  y="733" width="36" height="5"/>
-          {/* Capital echinus */}
-          <rect x="17"  y="492" width="30" height="8"/>
-          <rect x="14"  y="484" width="36" height="10"/>
-          {/* Fluting */}
+          <rect x="22"  y="500" width="20" height="230"/>   {/* shaft */}
+          <rect x="17"  y="728" width="30" height="6"/>     {/* base plinth upper */}
+          <rect x="14"  y="733" width="36" height="5"/>     {/* base plinth lower */}
+          <rect x="17"  y="492" width="30" height="8"/>     {/* capital echinus */}
+          <rect x="14"  y="484" width="36" height="10"/>    {/* capital abacus */}
+          {/* Fluting: dark vertical grooves carved into the shaft */}
           <rect x="27"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
           <rect x="32"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
           <rect x="37"  y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
         </g>
 
-        {/* ── Right Doric column — moved inward symmetrically ── */}
+        {/* ── Right Doric column — mirror of left at x=458 axis ── */}
         <g opacity="0.100" fill={gold}>
           <rect x="438" y="500" width="20" height="230"/>
           <rect x="433" y="728" width="30" height="6"/>
@@ -131,7 +150,7 @@ function StoicBackground() {
           <rect x="453" y="500" width="1.2" height="228" fill="#080808" opacity="0.6"/>
         </g>
 
-        {/* ── ΛΟΓΟΣ watermark (Logos — Stoic universal reason) ── */}
+        {/* ── ΛΟΓΟΣ watermark — Stoic concept of universal rational order (Logos) ── */}
         <text
           x="240" y="442"
           textAnchor="middle"
@@ -149,9 +168,13 @@ function StoicBackground() {
 }
 
 // ─── Focus Screen ─────────────────────────────────────────────────────────────
+// Shown once per day before the main app. Displays the daily Stoic quote with a
+// mandatory read timer (FOCUS_TIMER_SECONDS). An optional reflection textarea
+// lets the user record their response before proceeding.
 
 function FocusScreen({ focus, timer, ready, reflection, onReflection, onProceed, reflectionEnabled }) {
-  const pct = ((12 - timer) / 12) * 100
+  // Progress percentage for the countdown bar (fills left-to-right as time elapses)
+  const pct = ((FOCUS_TIMER_SECONDS - timer) / FOCUS_TIMER_SECONDS) * 100
   return (
     <div className="focus-screen fade-in">
       <StoicBackground />
@@ -198,6 +221,10 @@ function LogTab({ goals, logs, onLog }) {
   const weekDates = getWeekDates()
   const [animIds, setAnimIds] = useState([])
 
+  // Toggle a binary/streak goal for today and trigger the check-pop animation.
+  // The 300ms timeout matches the CSS animation duration. In React 18 a setState
+  // call after unmount (e.g. user switches tabs mid-animation) silently no-ops,
+  // so no explicit cleanup ref is required for this short duration.
   const tap = (goalId) => {
     const cur = todayLogs[goalId]
     onLog(goalId, cur ? 0 : 1)
@@ -240,7 +267,14 @@ function LogTab({ goals, logs, onLog }) {
 
   const daily    = goals.filter(g => !g.timeframe || g.timeframe === 'daily' || g.timeframe === 'weekly')
   const longTerm = goals.filter(g => g.timeframe === 'monthly' || g.timeframe === 'yearly')
-  const doneCount = Object.keys(todayLogs).filter(k => todayLogs[k] && todayLogs[k] !== '0').length
+
+  // Count completions only for goals that still exist. Log entries for deleted
+  // goals persist in localStorage (intentional — preserves history), so we
+  // must filter by the current active goal IDs to avoid inflating the count.
+  const activeGoalIds = new Set(goals.map(g => g.id))
+  const doneCount = Object.keys(todayLogs).filter(
+    k => activeGoalIds.has(k) && todayLogs[k] && todayLogs[k] !== '0'
+  ).length
 
   return (
     <div className="log-tab fade-in">
@@ -549,7 +583,8 @@ function ProgressTab({ goals, logs, virtueXP }) {
       </div>
       <div className="week-grid">
         {week.map((d, i) => {
-          const score    = dayScores[i]
+          // Rename to dayScore to avoid shadowing the outer `score` (weekly aggregate)
+          const dayScore = dayScores[i]
           const isFuture = d > today
           const isToday  = d === today
           const di       = new Date(d).getDay()
@@ -557,10 +592,10 @@ function ProgressTab({ goals, logs, virtueXP }) {
           return (
             <div key={d} className={`week-cell ${isToday ? 'today' : ''}`}>
               <span className="day-label">{label}</span>
-              {!isFuture && score !== null ? (
+              {!isFuture && dayScore !== null ? (
                 <span className="day-score"
-                  style={{ color: score >= 70 ? 'var(--gold)' : score >= 40 ? 'var(--text)' : 'var(--dim)' }}>
-                  {score}
+                  style={{ color: dayScore >= 70 ? 'var(--gold)' : dayScore >= 40 ? 'var(--text)' : 'var(--dim)' }}>
+                  {dayScore}
                 </span>
               ) : (
                 <span className="day-score" style={{ color: 'var(--border)' }}>—</span>
@@ -648,7 +683,13 @@ const DEFAULTS = {
   goals:    [],
   logs:     {},
   virtueXP: { courage: 0, wisdom: 0, temperance: 0, justice: 0 },
-  settings: { theme: 'dark', textSize: 'medium', reflectionEnabled: true },
+  settings: {
+    // theme: planned for future dark/light toggle — not yet applied anywhere in CSS.
+    // Kept in DEFAULTS so it persists to localStorage and is available when implemented.
+    theme:              'dark',
+    textSize:           'medium',
+    reflectionEnabled:  true,
+  },
 }
 
 export default function App() {
@@ -659,29 +700,37 @@ export default function App() {
   const [logs,       setLogs]       = useState(DEFAULTS.logs)
   const [virtueXP,   setVirtueXP]   = useState(DEFAULTS.virtueXP)
   const [settings,   setSettings]   = useState(DEFAULTS.settings)
-  const [focusTimer, setFocusTimer] = useState(12)
+  const [focusTimer, setFocusTimer] = useState(FOCUS_TIMER_SECONDS)
   const [focusReady, setFocusReady] = useState(false)
   const [reflection, setReflection] = useState('')
   const [focusIdx,   setFocusIdx]   = useState(0)
 
-  // Load from localStorage on mount
+  // Load persisted data from localStorage on first mount.
   useEffect(() => {
     const g   = storageGet('stoic-goals',     DEFAULTS.goals)
     const l   = storageGet('stoic-logs',      DEFAULTS.logs)
     const xp  = storageGet('stoic-virtue-xp', DEFAULTS.virtueXP)
     const fd  = storageGet('stoic-focus-date','')
-    const s   = storageGet('stoic-settings',  DEFAULTS.settings)
+    // Spread DEFAULTS.settings first so any keys added after a user's initial
+    // install (e.g. reflectionEnabled added in a later version) always have a
+    // default value rather than landing as undefined.
+    const s   = { ...DEFAULTS.settings, ...storageGet('stoic-settings', {}) }
 
     setGoals(g); setLogs(l); setVirtueXP(xp); setSettings(s)
 
+    // Deterministically pick today's quote: sum of YYYY + MM + DD digits.
+    // Adjacent days differ by 1, so the quote rotates daily without randomness.
     const today = todayStr()
     const hash  = today.split('-').reduce((a, n) => a + parseInt(n, 10), 0)
     setFocusIdx(hash % STOIC_CONTENT.length)
+
+    // Skip focus screen if the user has already passed through it today.
     if (fd === today) setScreen('main')
     setLoaded(true)
   }, [])
 
-  // Countdown
+  // Countdown timer — decrements once per second while focus screen is active.
+  // Stops at 0 and flips focusReady to unlock the Proceed button.
   useEffect(() => {
     if (screen !== 'focus' || !loaded) return
     if (focusTimer <= 0) { setFocusReady(true); return }
@@ -689,27 +738,32 @@ export default function App() {
     return () => clearTimeout(t)
   }, [screen, focusTimer, loaded])
 
+  // Stamp today's date into localStorage so the focus screen is skipped for the rest of the day.
   const handleProceed = useCallback(() => {
-    const today = todayStr()
-    storageSet('stoic-focus-date', today)
+    storageSet('stoic-focus-date', todayStr())
     setScreen('main')
   }, [])
 
+  // Persist goals to localStorage and update React state atomically.
   const updateGoals = useCallback(ng => {
     setGoals(ng)
     storageSet('stoic-goals', ng)
   }, [])
 
+  // Log a goal value for today and award XP on the first completion of the day.
+  // XP = goal weight × 10. Only awarded once per goal per day (not on unchecks).
   const logGoal = useCallback((goalId, value) => {
     const today    = todayStr()
     const newLogs  = { ...logs, [today]: { ...(logs[today] || {}), [goalId]: value } }
     setLogs(newLogs)
     storageSet('stoic-logs', newLogs)
 
-    // Award XP once per goal per day on first completion
-    const goal = goals.find(g => g.id === goalId)
+    const goal      = goals.find(g => g.id === goalId)
     const prevLogged = (logs[today] || {})[goalId]
-    if (goal && value && value !== 0 && value !== '0' && value !== '' && (!prevLogged || prevLogged === 0)) {
+    const isCompletion = value && value !== 0 && value !== '0' && value !== ''
+    const wasAlreadyLogged = prevLogged && prevLogged !== 0
+
+    if (goal && isCompletion && !wasAlreadyLogged) {
       const xpGain = (goal.weight || 1) * 10
       const newXP  = { ...virtueXP, [goal.virtue]: (virtueXP[goal.virtue] || 0) + xpGain }
       setVirtueXP(newXP)
@@ -717,11 +771,14 @@ export default function App() {
     }
   }, [logs, goals, virtueXP])
 
+  // Persist settings changes immediately so they survive a reload.
   const updateSettings = useCallback(ns => {
     setSettings(ns)
     storageSet('stoic-settings', ns)
   }, [])
 
+  // Show a minimal loading shell while localStorage is being read.
+  // This prevents a flash of default state before stored data is applied.
   if (!loaded) return (
     <div style={{
       background: '#080808', height: '100%',
@@ -763,13 +820,9 @@ export default function App() {
             {activeTab === 'settings' && <SettingsTab settings={settings} onUpdate={updateSettings} />}
           </div>
 
+          {/* NAV_TABS is a module-level constant — avoids re-allocating the array on every render. */}
           <nav className="bottom-nav">
-            {[
-              { id: 'log',      label: 'Log',      Icon: LogIcon },
-              { id: 'goals',    label: 'Goals',    Icon: GoalsIcon },
-              { id: 'progress', label: 'Progress', Icon: ProgressIcon },
-              { id: 'settings', label: 'Settings', Icon: SettingsIcon },
-            ].map(({ id, label, Icon }) => (
+            {NAV_TABS.map(({ id, label, Icon }) => (
               <button key={id}
                 className={`nav-item ${activeTab === id ? 'active' : ''}`}
                 onClick={() => setActiveTab(id)}>
