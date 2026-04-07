@@ -199,15 +199,37 @@ function TransformationAvatar({ stage }) {
   const isUpright  = stage >= 3 && stage < 7
   const isRadiant  = stage >= 7
 
-  // Void stage (0): scattered faint particles only
+  // Void stage (0): broken/dissolved form — fragments of what could become a figure
   if (stage === 0) {
     return (
       <svg viewBox="0 0 140 160" width="140" height="160" aria-hidden="true">
+        {/* Broken arc — remnant of a head */}
+        <path d="M58,20 A13,13 0 0,1 76,20" stroke={gold} strokeWidth="0.9" fill="none" opacity="0.22" strokeLinecap="round"/>
+        <path d="M76,26 A13,13 0 0,1 62,36" stroke={gold} strokeWidth="0.7" fill="none" opacity="0.15" strokeLinecap="round"/>
+        {/* Spine fragment */}
+        <line x1="69" y1="40" x2="69" y2="56" stroke={gold} strokeWidth="0.9" opacity="0.20" strokeLinecap="round"/>
+        {/* Shoulder/torso fragments */}
+        <line x1="56" y1="50" x2="66" y2="47" stroke={gold} strokeWidth="0.7" opacity="0.17" strokeLinecap="round"/>
+        <line x1="73" y1="47" x2="83" y2="52" stroke={gold} strokeWidth="0.7" opacity="0.14" strokeLinecap="round"/>
+        {/* Arm fragments — disconnected */}
+        <line x1="54" y1="52" x2="44" y2="68" stroke={gold} strokeWidth="0.8" opacity="0.16" strokeLinecap="round"/>
+        <line x1="40" y1="74" x2="36" y2="83" stroke={gold} strokeWidth="0.6" opacity="0.10" strokeLinecap="round"/>
+        <line x1="85" y1="54" x2="92" y2="68" stroke={gold} strokeWidth="0.7" opacity="0.13" strokeLinecap="round"/>
+        {/* Torso lower */}
+        <line x1="65" y1="58" x2="63" y2="76" stroke={gold} strokeWidth="0.8" opacity="0.18" strokeLinecap="round"/>
+        {/* Leg fragments — broken */}
+        <line x1="63" y1="78" x2="56" y2="96" stroke={gold} strokeWidth="0.9" opacity="0.19" strokeLinecap="round"/>
+        <line x1="54" y1="100" x2="50" y2="114" stroke={gold} strokeWidth="0.6" opacity="0.12" strokeLinecap="round"/>
+        <line x1="67" y1="78" x2="73" y2="94" stroke={gold} strokeWidth="0.8" opacity="0.16" strokeLinecap="round"/>
+        <line x1="75" y1="100" x2="78" y2="110" stroke={gold} strokeWidth="0.5" opacity="0.10" strokeLinecap="round"/>
+        {/* Scattered dissolution particles — further from the form */}
         {[
-          [40, 60], [100, 45], [70, 30], [30, 100], [110, 90],
-          [55, 130], [88, 120], [20, 75], [120, 60],
-        ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="1.2" fill={gold} opacity={0.08 + (i % 3) * 0.04} />
+          [28,22,1.6,0.12],[112,35,1.1,0.09],[32,108,1.4,0.11],
+          [108,96,1.0,0.09],[22,138,1.2,0.10],[116,122,1.5,0.11],
+          [96,18,0.9,0.08],[18,55,1.1,0.09],[120,62,1.3,0.10],
+          [42,148,0.8,0.07],[100,148,1.1,0.09],[104,76,0.9,0.08],
+        ].map(([x, y, r, o], i) => (
+          <circle key={i} cx={x} cy={y} r={r} fill={gold} opacity={o}/>
         ))}
       </svg>
     )
