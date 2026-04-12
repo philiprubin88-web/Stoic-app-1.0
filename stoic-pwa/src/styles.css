@@ -512,13 +512,21 @@ body {
   border-top: 1px solid var(--border);
   width: 100%;
   max-width: 480px;
+  /* Use flex column so body scrolls and footer stays pinned */
+  display: flex;
+  flex-direction: column;
   max-height: calc(100dvh - var(--sat) - 16px);
   max-height: calc(100vh - var(--sat) - 16px);
-  padding: 20px 16px calc(var(--sab) + 56px);
+  overflow: hidden;           /* clip children; scrolling lives in .modal-body */
+  will-change: transform;
+}
+/* Scrollable area — all form content lives here */
+.modal-body {
+  flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  will-change: transform;
+  padding: 20px 16px 8px;
 }
 .modal-title {
   font-size: var(--fs-xs);
@@ -590,20 +598,12 @@ body {
 .weight-btn.selected { background: var(--gold); border-color: var(--gold); color: #000; }
 
 .modal-actions {
+  flex-shrink: 0;
   display: flex;
   gap: 8px;
-  margin-top: 20px;
-  /* Stick to bottom so it's always reachable without scrolling */
-  position: sticky;
-  bottom: 0;
-  background: var(--bg-s);
-  padding: 12px 0 0;
-  margin-left: -16px;
-  margin-right: -16px;
-  padding-left: 16px;
-  padding-right: 16px;
-  padding-bottom: calc(var(--sab) + 12px);
+  padding: 12px 16px calc(var(--sab) + 12px);
   border-top: 1px solid var(--border);
+  background: var(--bg-s);
 }
 .btn-cancel {
   flex: 1;
@@ -636,6 +636,50 @@ body {
   border-radius: 0;
 }
 .btn-save:disabled { opacity: .3; }
+
+/* ─── Frequency stepper ──────────────────────────────────────────────────── */
+.frequency-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-e);
+  width: 100%;
+  min-height: var(--touch-min);
+}
+.freq-btn {
+  flex: 0 0 var(--touch-min);
+  height: var(--touch-min);
+  background: transparent;
+  border: none;
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s, background .15s;
+  -webkit-appearance: none;
+}
+.freq-btn:active:not(:disabled) { background: var(--bg-s); color: var(--text); }
+.freq-btn:disabled               { opacity: .3; }
+.freq-value {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 300;
+  color: var(--gold);
+  letter-spacing: .1em;
+  line-height: var(--touch-min);
+}
+.freq-hint {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .12em;
+  margin-top: 5px;
+}
 
 /* ─── Progress Tab ───────────────────────────────────────────────────────── */
 .progress-tab { padding: 14px; }

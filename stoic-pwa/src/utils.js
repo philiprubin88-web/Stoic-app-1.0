@@ -32,21 +32,50 @@ export function calcWeeklyScore(goals, logs) {
   if (!goals.length) return 0
   const week = getWeekDates()
   let totalWeight = 0, earnedWeight = 0
+
   goals.forEach(goal => {
-    const w = goal.weight || 1
-    totalWeight += w * 7
-    week.forEach(date => {
-      const dayLog = logs[date] || {}
-      const val = dayLog[goal.id]
-      if (goal.type === 'binary' || goal.type === 'streak') {
-        if (val === true || val === 1) earnedWeight += w
-      } else if (goal.type === 'quantitative') {
-        if (val && parseFloat(val) >= parseFloat(goal.target_value || 1)) earnedWeight += w
-        else if (val && parseFloat(val) > 0)
-          earnedWeight += w * (parseFloat(val) / parseFloat(goal.target_value || 1))
+    const w    = goal.weight || 1
+    const freq = goal.frequency || 1
+    const tf   = goal.timeframe || 'daily'
+
+    // Count completions across a set of dates
+    const countDone = (dates) => dates.reduce((sum, date) => {
+      const val = (logs[date] || {})[goal.id]
+      if (goal.type === 'quantitative') {
+        const v = parseFloat(val)
+        const t = parseFloat(goal.target_value || 1)
+        if (v >= t) return sum + 1
+        if (v > 0)  return sum + v / t
+      } else {
+        if (val === 1 || val === true) return sum + 1
       }
-    })
+      return sum
+    }, 0)
+
+    if (tf === 'daily') {
+      // Must complete every day — 7 opportunities per week
+      totalWeight  += w * 7
+      earnedWeight += w * Math.min(countDone(week), 7)
+
+    } else if (tf === 'weekly') {
+      // Must complete `freq` times per week
+      totalWeight  += w * freq
+      earnedWeight += w * Math.min(countDone(week), freq)
+
+    } else if (tf === 'fortnight') {
+      // Must complete `freq` times per fortnight
+      // Pro-rate: one week = half a fortnight, so weekly target = freq / 2
+      const weeklyTarget = freq / 2
+      totalWeight  += w * weeklyTarget
+      earnedWeight += w * Math.min(countDone(week), weeklyTarget)
+
+    } else {
+      // Monthly / yearly — just needs to happen at least once this week
+      totalWeight  += w
+      earnedWeight += Math.min(countDone(week), 1) > 0 ? w : 0
+    }
   })
+
   return totalWeight > 0 ? Math.round((earnedWeight / totalWeight) * 100) : 0
 }
 

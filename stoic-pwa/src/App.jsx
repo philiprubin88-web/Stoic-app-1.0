@@ -112,6 +112,11 @@ function LogTab({ goals, logs, onLog }) {
             {goal.type === 'quantitative' && goal.target_value
               ? ` · ${goal.target_value}${goal.unit ? ' ' + goal.unit : ''}`
               : ''}
+            {goal.frequency > 1
+              ? ` · ${goal.frequency}× ${(goal.timeframe || 'daily').toUpperCase()}`
+              : goal.timeframe && goal.timeframe !== 'daily'
+                ? ` · ${goal.timeframe.toUpperCase()}`
+                : ''}
           </div>
         </div>
         {goal.type === 'quantitative' ? (
@@ -128,7 +133,7 @@ function LogTab({ goals, logs, onLog }) {
     )
   }
 
-  const daily    = goals.filter(g => !g.timeframe || g.timeframe === 'daily' || g.timeframe === 'weekly')
+  const daily    = goals.filter(g => !g.timeframe || g.timeframe === 'daily' || g.timeframe === 'weekly' || g.timeframe === 'fortnight')
   const longTerm = goals.filter(g => g.timeframe === 'monthly' || g.timeframe === 'yearly')
   const doneCount = Object.keys(todayLogs).filter(k => todayLogs[k] && todayLogs[k] !== '0').length
 
@@ -194,9 +199,25 @@ function LogTab({ goals, logs, onLog }) {
 
 // ─── Add Goal Modal ───────────────────────────────────────────────────────────
 
+const PERIOD_LABELS = {
+  daily:     'day',
+  weekly:    'week',
+  fortnight: 'fortnight',
+  monthly:   'month',
+  yearly:    'year',
+}
+
+const PERIOD_MAX = {
+  daily:     1,
+  weekly:    7,
+  fortnight: 14,
+  monthly:   30,
+  yearly:    52,
+}
+
 function AddGoalModal({ onSave, onClose }) {
   const [form, setForm] = useState({
-    name: '', type: 'binary', virtue: '', timeframe: 'daily', weight: 2, target_value: '', unit: ''
+    name: '', type: 'binary', virtue: '', timeframe: 'daily', frequency: 1, weight: 2, target_value: '', unit: ''
   })
   const valid = form.name.trim() && form.virtue
 
@@ -207,83 +228,118 @@ function AddGoalModal({ onSave, onClose }) {
     return () => { document.body.style.overflow = prev }
   }, [])
 
+  const changeTimeframe = (tf) => {
+    setForm(p => ({ ...p, timeframe: tf, frequency: 1 }))
+  }
+  const changeFrequency = (delta) => {
+    setForm(p => ({
+      ...p,
+      frequency: Math.min(PERIOD_MAX[p.timeframe], Math.max(1, p.frequency + delta))
+    }))
+  }
+
+  const showFrequency = form.timeframe !== 'daily' && form.timeframe !== 'yearly'
+  const periodLabel   = PERIOD_LABELS[form.timeframe] || form.timeframe
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">New Goal</div>
 
-        <div className="form-group">
-          <label className="form-label">Goal Name</label>
-          <input className="form-input" placeholder="e.g. Gym session"
-            value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-        </div>
+        {/* ── Scrollable body ── */}
+        <div className="modal-body">
+          <div className="modal-title">New Goal</div>
 
-        <div className="form-group">
-          <label className="form-label">Virtue</label>
-          <div className="virtue-grid">
-            {Object.entries(VIRTUES).map(([key, v]) => (
-              <button key={key}
-                className={`virtue-btn ${form.virtue === key ? 'selected' : ''}`}
-                style={form.virtue === key
-                  ? { background: v.color, borderColor: v.color }
-                  : { borderColor: v.dim }}
-                onClick={() => setForm(p => ({ ...p, virtue: key }))}>
-                {v.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Type</label>
-          <select className="form-select" value={form.type}
-            onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
-            <option value="binary">Binary (done / not done)</option>
-            <option value="quantitative">Quantitative (numeric target)</option>
-            <option value="streak">Streak (daily chain)</option>
-          </select>
-        </div>
-
-        {form.type === 'quantitative' && (
           <div className="form-group">
-            <label className="form-label">Target Value</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input className="form-input" type="number" inputMode="decimal"
-                placeholder="e.g. 10000" value={form.target_value}
-                onChange={e => setForm(p => ({ ...p, target_value: e.target.value }))}
-                style={{ flex: 2 }} />
-              <input className="form-input" placeholder="unit"
-                value={form.unit}
-                onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
-                style={{ flex: 1 }} />
+            <label className="form-label">Goal Name</label>
+            <input className="form-input" placeholder="e.g. Gym session"
+              value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Virtue</label>
+            <div className="virtue-grid">
+              {Object.entries(VIRTUES).map(([key, v]) => (
+                <button key={key}
+                  className={`virtue-btn ${form.virtue === key ? 'selected' : ''}`}
+                  style={form.virtue === key
+                    ? { background: v.color, borderColor: v.color }
+                    : { borderColor: v.dim }}
+                  onClick={() => setForm(p => ({ ...p, virtue: key }))}>
+                  {v.label}
+                </button>
+              ))}
             </div>
           </div>
-        )}
 
-        <div className="form-group">
-          <label className="form-label">Timeframe</label>
-          <select className="form-select" value={form.timeframe}
-            onChange={e => setForm(p => ({ ...p, timeframe: e.target.value }))}>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
+          <div className="form-group">
+            <label className="form-label">Type</label>
+            <select className="form-select" value={form.type}
+              onChange={e => setForm(p => ({ ...p, type: e.target.value }))}>
+              <option value="binary">Binary (done / not done)</option>
+              <option value="quantitative">Quantitative (numeric target)</option>
+              <option value="streak">Streak (daily chain)</option>
+            </select>
+          </div>
 
-        <div className="form-group">
-          <label className="form-label">Importance (1 – 5)</label>
-          <div className="weight-row">
-            {[1,2,3,4,5].map(w => (
-              <button key={w}
-                className={`weight-btn ${form.weight === w ? 'selected' : ''}`}
-                onClick={() => setForm(p => ({ ...p, weight: w }))}>
-                {w}
-              </button>
-            ))}
+          {form.type === 'quantitative' && (
+            <div className="form-group">
+              <label className="form-label">Target Value</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-input" type="number" inputMode="decimal"
+                  placeholder="e.g. 10000" value={form.target_value}
+                  onChange={e => setForm(p => ({ ...p, target_value: e.target.value }))}
+                  style={{ flex: 2 }} />
+                <input className="form-input" placeholder="unit"
+                  value={form.unit}
+                  onChange={e => setForm(p => ({ ...p, unit: e.target.value }))}
+                  style={{ flex: 1 }} />
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Timeframe</label>
+            <select className="form-select" value={form.timeframe}
+              onChange={e => changeTimeframe(e.target.value)}>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="fortnight">Fortnightly</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </div>
+
+          {showFrequency && (
+            <div className="form-group">
+              <label className="form-label">Times per {periodLabel}</label>
+              <div className="frequency-row">
+                <button className="freq-btn" onClick={() => changeFrequency(-1)}
+                  disabled={form.frequency <= 1}>−</button>
+                <span className="freq-value">{form.frequency}×</span>
+                <button className="freq-btn" onClick={() => changeFrequency(1)}
+                  disabled={form.frequency >= PERIOD_MAX[form.timeframe]}>+</button>
+              </div>
+              <div className="freq-hint">
+                e.g. {form.frequency === 1 ? 'once' : `${form.frequency} times`} per {periodLabel}
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Importance (1 – 5)</label>
+            <div className="weight-row">
+              {[1,2,3,4,5].map(w => (
+                <button key={w}
+                  className={`weight-btn ${form.weight === w ? 'selected' : ''}`}
+                  onClick={() => setForm(p => ({ ...p, weight: w }))}>
+                  {w}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* ── Sticky footer — always visible ── */}
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onClose}>Cancel</button>
           <button className="btn-save" disabled={!valid}
@@ -291,6 +347,7 @@ function AddGoalModal({ onSave, onClose }) {
             Add Goal
           </button>
         </div>
+
       </div>
     </div>
   )
@@ -329,7 +386,11 @@ function GoalsTab({ goals, onUpdate }) {
                 <div className="goal-manage-info">
                   <div className="goal-name">{goal.name}</div>
                   <div className="goal-meta">
-                    {(goal.type || 'binary').toUpperCase()} · {(goal.timeframe || 'daily').toUpperCase()} · WT {goal.weight}
+                    {(goal.type || 'binary').toUpperCase()} ·{' '}
+                    {goal.frequency > 1
+                      ? `${goal.frequency}× ${(goal.timeframe || 'daily').toUpperCase()}`
+                      : (goal.timeframe || 'daily').toUpperCase()
+                    } · WT {goal.weight}
                     {goal.type === 'quantitative' && goal.target_value
                       ? ` · ${goal.target_value}${goal.unit ? ' ' + goal.unit : ''}`
                       : ''}
