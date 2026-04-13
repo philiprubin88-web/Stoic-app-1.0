@@ -1,0 +1,831 @@
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* ─── CSS Variables ──────────────────────────────────────────────────────── */
+:root {
+  --bg:         #080808;
+  --bg-s:       #111111;
+  --bg-e:       #1a1a1a;
+  --text:       #e0d8cc;
+  --text-dim:   #908880;
+  --dim:        #55504a;
+  --mid:        #908880;
+  --gold:       #c9a84c;
+  --gold-d:     #5a4818;
+  --green:      #7BA08A;
+  --blue:       #7a95a8;
+  --rust:       #b57a6e;
+  --border:     #1e1e1e;
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-mono:    'DM Mono', 'Courier New', monospace;
+
+  /* Text sizes */
+  --fs-xs:   11px;
+  --fs-sm:   13px;
+  --fs-base: 15px;
+  --fs-md:   17px;
+  --fs-lg:   21px;
+  --fs-xl:   30px;
+  --fs-2xl:  44px;
+
+  /* Touch target minimum (Apple HIG = 44pt) */
+  --touch-min: 44px;
+
+  /* Safe areas for notch / home bar */
+  --sat: env(safe-area-inset-top,    0px);
+  --sar: env(safe-area-inset-right,  0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left,   0px);
+
+  /* Nav height */
+  --nav-h: calc(62px + var(--sab));
+}
+
+/* Text size overrides */
+[data-size='small'] {
+  --fs-xs: 10px; --fs-sm: 12px; --fs-base: 14px;
+  --fs-md: 16px; --fs-lg: 19px; --fs-xl:  26px; --fs-2xl: 38px;
+}
+[data-size='large'] {
+  --fs-xs: 12px; --fs-sm: 14px; --fs-base: 17px;
+  --fs-md: 19px; --fs-lg: 23px; --fs-xl:  34px; --fs-2xl: 50px;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+html {
+  /* dvh = dynamic viewport height — excludes Safari's collapsing toolbar */
+  height: 100vh;
+  height: 100dvh;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+body {
+  height: 100vh;
+  height: 100dvh;
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Centre on wide screens */
+  position: relative;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+
+@keyframes checkPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+.check-pop { animation: checkPop 0.2s ease; }
+
+/* ─── Focus Screen ───────────────────────────────────────────────────────── */
+.focus-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: calc(var(--sat) + 32px) 24px calc(var(--sab) + 32px);
+  position: relative;
+  background: var(--bg);
+}
+
+.focus-bg-glow {
+  position: fixed;
+  top: 0; left: 0; right: 0; height: 280px;
+  background:
+    radial-gradient(ellipse at 70% 0%,  rgba(201,168,76,.07) 0%, transparent 65%),
+    radial-gradient(ellipse at 20% 40%, rgba(123,160,138,.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.focus-label {
+  font-size: var(--fs-xs);
+  letter-spacing: .28em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-bottom: 36px;
+}
+
+.focus-quote {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.focus-author {
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  color: var(--gold);
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
+
+.focus-divider {
+  width: 32px;
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 22px;
+}
+
+.focus-interpretation {
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+  color: var(--mid);
+  margin-bottom: 22px;
+  flex: 1;
+}
+
+.focus-prompt {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-style: italic;
+  color: var(--text);
+  line-height: 1.5;
+  margin-bottom: 28px;
+  padding-left: 14px;
+  border-left: 1px solid var(--gold-d);
+}
+
+.focus-reflection {
+  width: 100%;
+  background: var(--bg-s);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-base);
+  padding: 12px 14px;
+  resize: none;
+  outline: none;
+  margin-bottom: 20px;
+  height: 60px;
+  line-height: 1.6;
+  /* iOS: prevent zoom on focus */
+  font-size: max(16px, var(--fs-sm));
+}
+.focus-reflection::placeholder { color: var(--dim); }
+.focus-reflection:focus         { border-color: var(--gold-d); }
+
+.focus-timer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.timer-track {
+  flex: 1; height: 1px;
+  background: var(--border);
+  position: relative;
+}
+.timer-fill {
+  position: absolute;
+  left: 0; top: 0; height: 100%;
+  background: var(--gold);
+  transition: width 1s linear;
+}
+.timer-count {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .1em;
+  min-width: 24px;
+  text-align: right;
+}
+
+.btn-proceed {
+  width: 100%;
+  min-height: var(--touch-min);
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  padding: 14px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  /* Prevent iOS button styling */
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.btn-proceed:active:not(:disabled) { background: var(--gold); color: #000; }
+.btn-proceed:disabled              { opacity: .3; }
+
+/* ─── Main App Shell ─────────────────────────────────────────────────────── */
+.main-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-header {
+  flex-shrink: 0;
+  padding: calc(var(--sat) + 14px) 20px 14px;
+  display: flex;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.app-logo {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 500;
+  letter-spacing: .25em;
+  color: var(--text);
+}
+
+.app-date {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .12em;
+  margin-left: auto;
+}
+
+.tab-content {
+  flex: 1;
+  min-height: 0;           /* CRITICAL: without this, flex child ignores overflow-y */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+.bottom-nav {
+  flex-shrink: 0;
+  display: flex;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--sab);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-min);
+  padding: 8px 4px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--dim);
+  transition: color .15s;
+  gap: 3px;
+  /* Prevent iOS button flash */
+  -webkit-appearance: none;
+}
+.nav-item.active { color: var(--gold); }
+.nav-item svg    { width: 20px; height: 20px; }
+.nav-label {
+  font-size: 9px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* ─── Shared ─────────────────────────────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-size: var(--fs-xs);
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+.empty-state p {
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--dim);
+  line-height: 2.5;
+}
+
+/* ─── Score Card ─────────────────────────────────────────────────────────── */
+.score-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  background: var(--bg-s);
+}
+.score-label {
+  font-size: var(--fs-xs);
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 2px;
+}
+.score-value {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1;
+}
+.score-unit {
+  font-size: var(--fs-sm);
+  color: var(--dim);
+  margin-left: 2px;
+}
+.tier-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  font-size: var(--fs-xs);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+.week-mini   { display: flex; gap: 5px; align-items: flex-end; }
+.week-day    { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.week-day-label { font-size: 8px; color: var(--dim); letter-spacing: .04em; }
+.week-day.today .week-day-label { color: var(--gold); }
+.streak-dot  { width: 7px; height: 7px; border-radius: 50%; }
+.streak-dot.done   { background: var(--gold); }
+.streak-dot.missed { background: var(--bg-e); border: 1px solid var(--border); }
+.streak-dot.future { background: transparent; border: 1px dashed var(--border); }
+
+/* ─── Log Tab ────────────────────────────────────────────────────────────── */
+.log-tab { padding: 14px 14px 8px; }
+
+.goal-item {
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--touch-min);
+  cursor: pointer;
+  transition: background .15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.goal-item.logged { background: var(--bg-s); }
+.goal-item:active { background: var(--bg-e); }
+
+.goal-virtue-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
+.goal-info    { flex: 1; min-width: 0; }
+.goal-name    { font-size: var(--fs-sm); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.goal-meta    { font-size: var(--fs-xs); color: var(--dim); letter-spacing: .06em; margin-top: 2px; }
+
+.goal-check {
+  width: 24px; height: 24px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.goal-check.checked { background: var(--gold); border-color: var(--gold); }
+.goal-check svg     { width: 14px; height: 14px; stroke: #000; }
+
+.quant-input {
+  width: 80px;
+  background: var(--bg-e);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  /* iOS: 16px minimum prevents auto-zoom */
+  font-size: max(16px, var(--fs-sm));
+  padding: 6px 8px;
+  text-align: right;
+  outline: none;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.quant-input:focus { border-color: var(--gold-d); }
+
+/* ─── Goals Tab ──────────────────────────────────────────────────────────── */
+.goals-tab { padding: 14px; }
+
+.btn-add {
+  width: 100%;
+  min-height: var(--touch-min);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  padding: 12px;
+  cursor: pointer;
+  margin-bottom: 18px;
+  transition: border-color .15s, color .15s;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.btn-add:active { border-color: var(--gold-d); color: var(--text); }
+
+.goal-manage-item {
+  border: 1px solid var(--border);
+  padding: 0 14px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--touch-min);
+}
+.goal-manage-info { flex: 1; min-width: 0; }
+
+.btn-delete {
+  background: none; border: none;
+  color: var(--dim);
+  cursor: pointer;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  transition: color .15s;
+}
+.btn-delete:active { color: #b55; }
+
+/* ─── Add Goal Screen ────────────────────────────────────────────────────────
+   Sibling of .focus-screen and .main-app — own explicit height, own scroll.
+   Modelled on .focus-screen which already works perfectly on iOS.          */
+
+.add-goal-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* Scrollable field area — flex:1 inside an explicitly-sized flex container */
+.add-goal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 20px 16px 8px;
+}
+
+/* Always-visible footer — never inside the scroll area */
+.add-goal-footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px calc(var(--sab) + 12px);
+  border-top: 1px solid var(--border);
+  background: var(--bg-s);
+}
+
+.form-group  { margin-bottom: 14px; }
+.form-label  {
+  display: block;
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.form-input, .form-select {
+  width: 100%;
+  background: var(--bg-e);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  /* iOS: 16px minimum prevents auto-zoom on focus */
+  font-size: max(16px, var(--fs-sm));
+  padding: 11px 12px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+  min-height: var(--touch-min);
+}
+.form-input:focus,
+.form-select:focus { border-color: var(--gold-d); }
+
+.virtue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.virtue-btn {
+  padding: 12px;
+  min-height: var(--touch-min);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.virtue-btn.selected { color: #000; }
+
+.weight-row { display: flex; gap: 6px; }
+.weight-btn {
+  flex: 1;
+  min-height: var(--touch-min);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.weight-btn.selected { background: var(--gold); border-color: var(--gold); color: #000; }
+
+
+.btn-cancel {
+  flex: 1;
+  min-height: var(--touch-min);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  padding: 12px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.btn-save {
+  flex: 2;
+  min-height: var(--touch-min);
+  background: var(--gold);
+  border: 1px solid var(--gold);
+  color: #000;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  padding: 12px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.btn-save:disabled { opacity: .3; }
+
+/* ─── Period progress badge (in log rows) ────────────────────────────────── */
+.period-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  flex-shrink: 0;
+  margin-right: 4px;
+  min-width: 28px;
+}
+.period-count {
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 300;
+  line-height: 1;
+}
+.period-unit {
+  font-size: 8px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* ─── Frequency stepper ──────────────────────────────────────────────────── */
+.frequency-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-e);
+  width: 100%;
+  min-height: var(--touch-min);
+}
+.freq-btn {
+  flex: 0 0 var(--touch-min);
+  height: var(--touch-min);
+  background: transparent;
+  border: none;
+  color: var(--mid);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color .15s, background .15s;
+  -webkit-appearance: none;
+}
+.freq-btn:active:not(:disabled) { background: var(--bg-s); color: var(--text); }
+.freq-btn:disabled               { opacity: .3; }
+.freq-value {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 300;
+  color: var(--gold);
+  letter-spacing: .1em;
+  line-height: var(--touch-min);
+}
+.freq-hint {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .12em;
+  margin-top: 5px;
+}
+
+/* ─── Progress Tab ───────────────────────────────────────────────────────── */
+.progress-tab { padding: 14px; }
+
+.virtue-tree-card {
+  border: 1px solid var(--border);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.virtue-tree-header { display: flex; align-items: center; margin-bottom: 8px; }
+.virtue-tree-name {
+  font-size: var(--fs-xs);
+  letter-spacing: .28em;
+  text-transform: uppercase;
+}
+.virtue-tree-level {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 300;
+  line-height: 1;
+}
+.virtue-tree-title {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .15em;
+  margin-bottom: 8px;
+}
+.progress-track {
+  height: 2px;
+  background: var(--bg-e);
+  position: relative;
+  margin-bottom: 4px;
+}
+.progress-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  transition: width .5s ease;
+}
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .04em;
+}
+.level-nodes { display: flex; gap: 3px; margin-top: 10px; }
+.level-node {
+  flex: 1; height: 4px;
+  background: var(--bg-e);
+  border: 1px solid var(--border);
+  transition: background .3s;
+}
+.level-node.reached { border: none; }
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.week-cell {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--bg-s);
+  gap: 3px;
+}
+.week-cell.today { border-color: var(--gold-d); }
+.day-label { font-size: 8px; color: var(--dim); letter-spacing: .03em; }
+.day-score { font-size: 11px; }
+
+/* ─── Settings Tab ───────────────────────────────────────────────────────── */
+.settings-tab { padding: 14px; }
+
+.settings-section { margin-bottom: 24px; }
+.settings-section-title {
+  font-size: var(--fs-xs);
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--touch-min);
+  border-bottom: 1px solid #121212;
+  padding: 4px 0;
+}
+.settings-label { font-size: var(--fs-sm); color: var(--text); }
+
+.toggle {
+  width: 44px; height: 26px;
+  background: var(--border);
+  border-radius: 13px;
+  position: relative;
+  cursor: pointer;
+  transition: background .2s;
+  border: none; padding: 0;
+  flex-shrink: 0;
+  -webkit-appearance: none;
+}
+.toggle.on { background: var(--gold); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 4px; left: 4px;
+  transition: left .2s;
+}
+.toggle.on::after { left: 22px; }
+
+.select-row { display: flex; gap: 6px; }
+.select-chip {
+  padding: 6px 12px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .1em;
+  cursor: pointer;
+  transition: all .15s;
+  -webkit-appearance: none;
+  border-radius: 0;
+}
+.select-chip.active { background: var(--gold); border-color: var(--gold); color: #000; }
+.select-chip:active { opacity: .7; }
+
+.app-version {
+  font-size: var(--fs-xs);
+  color: var(--dim);
+  letter-spacing: .18em;
+  text-align: center;
+  margin-top: 32px;
+  padding-bottom: 8px;
+}
