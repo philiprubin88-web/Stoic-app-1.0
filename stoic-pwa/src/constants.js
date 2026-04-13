@@ -88,3 +88,136 @@ export const TIERS = [
   { min: 70, label: 'Disciplined',   color: '#7a95a8' },
   { min: 85, label: 'Exceptional',   color: '#D4A843' },
 ]
+
+// ─── Stoic Challenges ─────────────────────────────────────────────────────────
+// A new challenge rotates in each week, determined by the week number.
+//
+// TO ADD A NEW CHALLENGE — append an object to this array:
+// {
+//   id:          string  — unique slug, e.g. 'courage-4'
+//   virtue:      string  — 'courage' | 'wisdom' | 'temperance' | 'justice'
+//   title:       string  — short name shown as the heading (max ~30 chars)
+//   description: string  — 1–2 sentences on what to do
+//   constraint:  string  — the specific rule that must be observed
+//   completion:  string  — measurable condition that counts as a successful day
+//   duration:    number  — how many days the challenge runs (3–7)
+// }
+
+export const CHALLENGES = [
+
+  // ── Courage ──────────────────────────────────────────────────────────────
+  {
+    id: 'courage-1',
+    virtue: 'courage',
+    title: 'The Difficult Conversation',
+    description: 'Initiate one conversation you have been actively avoiding.',
+    constraint: 'Must be in person or by phone — not a text or email.',
+    completion: 'Have the conversation and sit with the discomfort.',
+    duration: 3,
+  },
+  {
+    id: 'courage-2',
+    virtue: 'courage',
+    title: 'Do What You Have Avoided',
+    description: 'Each day, identify and complete one task you have been postponing.',
+    constraint: 'Must be something delayed for at least one week.',
+    completion: 'Complete the avoided task before the day ends.',
+    duration: 5,
+  },
+  {
+    id: 'courage-3',
+    virtue: 'courage',
+    title: 'Speak Without Filtering',
+    description: 'Share your honest opinion once each day where you would normally stay silent.',
+    constraint: 'Must be constructive — courage is not cruelty.',
+    completion: 'Speak your mind once, then reflect on the outcome.',
+    duration: 5,
+  },
+
+  // ── Temperance ───────────────────────────────────────────────────────────
+  {
+    id: 'temperance-1',
+    virtue: 'temperance',
+    title: 'No Added Sugar',
+    description: 'Eliminate added sugar from your diet entirely.',
+    constraint: 'No sweets, sugary drinks, or processed snacks with added sugar.',
+    completion: 'Complete the day without consuming added sugar.',
+    duration: 3,
+  },
+  {
+    id: 'temperance-2',
+    virtue: 'temperance',
+    title: 'Digital Sunset',
+    description: 'No social media, news feeds, or video content after 8pm.',
+    constraint: 'All platforms — no exceptions. Use that time to read or think.',
+    completion: 'Complete each evening screen-free from 8pm onward.',
+    duration: 7,
+  },
+  {
+    id: 'temperance-3',
+    virtue: 'temperance',
+    title: 'Deliberate Consumption',
+    description: 'Before each non-essential purchase or snack, pause 60 seconds and ask if you truly need it.',
+    constraint: 'Applies to all impulsive spending and eating outside scheduled meals.',
+    completion: 'Apply the pause without exception for the full day.',
+    duration: 5,
+  },
+
+  // ── Wisdom ───────────────────────────────────────────────────────────────
+  {
+    id: 'wisdom-1',
+    virtue: 'wisdom',
+    title: 'Five Minutes of Silence',
+    description: 'Begin each day with five minutes of deliberate, silent reflection.',
+    constraint: 'No phone, no music, no distraction. Sit and think.',
+    completion: 'Complete the morning reflection before touching your phone.',
+    duration: 5,
+  },
+  {
+    id: 'wisdom-2',
+    virtue: 'wisdom',
+    title: 'Read Every Day',
+    description: 'Read at least five pages of a non-fiction or philosophical book each day.',
+    constraint: 'Physical reading only — no audiobooks. No skimming.',
+    completion: 'Complete at least five pages of meaningful reading.',
+    duration: 7,
+  },
+  {
+    id: 'wisdom-3',
+    virtue: 'wisdom',
+    title: 'Write to Understand',
+    description: 'Write three sentences each evening about what you learned or observed.',
+    constraint: 'Must be specific — real observations, not vague generalities.',
+    completion: 'Write three concrete sentences before sleep.',
+    duration: 5,
+  },
+
+  // ── Justice ──────────────────────────────────────────────────────────────
+  {
+    id: 'justice-1',
+    virtue: 'justice',
+    title: 'Unrecognised Service',
+    description: 'Do something genuinely helpful for another person without telling anyone.',
+    constraint: 'Do not seek acknowledgement. The act must be its own reward.',
+    completion: 'Complete one act of quiet service.',
+    duration: 3,
+  },
+  {
+    id: 'justice-2',
+    virtue: 'justice',
+    title: 'Resolve a Conflict',
+    description: 'Take a meaningful step each day toward resolving a lingering tension or disagreement.',
+    constraint: 'Must be a real conflict — not a minor inconvenience.',
+    completion: 'Take one concrete step toward resolution.',
+    duration: 5,
+  },
+  {
+    id: 'justice-3',
+    virtue: 'justice',
+    title: 'Full Presence',
+    description: 'Give your complete, undivided attention to each person you speak with.',
+    constraint: 'No phone during conversations. No half-listening.',
+    completion: 'Complete each conversation without checking your phone.',
+    duration: 3,
+  },
+]

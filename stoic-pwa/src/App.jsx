@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import './styles.css'
-import { VIRTUES, STOIC_CONTENT, VIRTUE_LEVELS } from './constants.js'
+import { VIRTUES, STOIC_CONTENT, VIRTUE_LEVELS, CHALLENGES } from './constants.js'
 import { todayStr, getWeekDates, getVirtueLevel, calcWeeklyScore, getTier, uid } from './utils.js'
 import { storageGet, storageSet } from './storage.js'
 
@@ -9,8 +9,7 @@ import { storageGet, storageSet } from './storage.js'
 const LogIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
     <rect x="3" y="4" width="18" height="16" rx="1"/>
-    <line x1="7" y1="9" x2="17" y2="9"/>
-    <line x1="7" y1="13" x2="13" y2="13"/>
+    <line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/>
   </svg>
 )
 const GoalsIcon = () => (
@@ -21,8 +20,7 @@ const GoalsIcon = () => (
 )
 const ProgressIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <polyline points="3,17 8,12 13,15 21,7"/>
-    <polyline points="17,7 21,7 21,11"/>
+    <polyline points="3,17 8,12 13,15 21,7"/><polyline points="17,7 21,7 21,11"/>
   </svg>
 )
 const SettingsIcon = () => (
@@ -36,6 +34,36 @@ const CheckIcon = () => (
     <polyline points="3,8 6.5,11.5 13,4.5"/>
   </svg>
 )
+const EditIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+)
+
+// ─── Challenge helpers ────────────────────────────────────────────────────────
+
+function getWeekKey() {
+  const now  = new Date()
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const week = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7)
+  return `${now.getFullYear()}-${String(week).padStart(2, '0')}`
+}
+
+function pickChallenge(weekKey) {
+  const hash = weekKey.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return CHALLENGES[hash % CHALLENGES.length]
+}
+
+function isChallengeExpired(state) {
+  if (!state?.startDate) return false
+  const start  = new Date(state.startDate)
+  const def    = CHALLENGES.find(c => c.id === state.id)
+  if (!def) return true
+  const end    = new Date(start)
+  end.setDate(start.getDate() + def.duration)
+  return new Date() > end
+}
 
 // ─── Focus Screen ─────────────────────────────────────────────────────────────
 
@@ -69,48 +97,47 @@ function FocusScreen({ focus, timer, ready, reflection, onReflection, onProceed,
   )
 }
 
-// ─── Add Goal Wizard ──────────────────────────────────────────────────────────
-// 4-step wizard: each step is a single focused question that fits on one screen.
-// The wizard renders as position:fixed so no parent container can misplace it.
-// Back (←) and Next/Save are always visible — no scrolling ever required.
+// ─── Goal Wizard ──────────────────────────────────────────────────────────────
+// Used for both adding and editing goals.
+// position:fixed anchors it directly to the viewport — no parent layout issues.
 
 const PERIOD_MAX   = { daily: 1, weekly: 7, fortnight: 14, monthly: 30, yearly: 52 }
 const PERIOD_LABEL = { daily: 'day', weekly: 'week', fortnight: 'fortnight', monthly: 'month', yearly: 'year' }
 const BLANK_FORM   = { name: '', virtue: '', timeframe: 'daily', frequency: 1, type: 'binary', weight: 3, target_value: '', unit: '' }
 const STEPS        = ['name', 'virtue', 'schedule', 'details']
 
-function AddGoalWizard({ onSave, onCancel }) {
+function GoalWizard({ onSave, onCancel, initial = null }) {
+  const editMode = !!initial
   const [step, setStep] = useState(0)
-  const [form, setForm] = useState(BLANK_FORM)
+  const [form, setForm] = useState(initial ? { ...BLANK_FORM, ...initial } : BLANK_FORM)
   const patch = p => setForm(f => ({ ...f, ...p }))
 
   const canAdvance = step === 0 ? form.name.trim().length > 0
                    : step === 1 ? form.virtue !== ''
                    : true
 
-  const handleNext = () => step < STEPS.length - 1 ? setStep(s => s + 1) : onSave({ ...form, id: uid() })
+  const handleNext = () => {
+    if (step < STEPS.length - 1) return setStep(s => s + 1)
+    onSave(editMode ? { ...form } : { ...form, id: uid() })
+  }
   const handleBack = () => step === 0 ? onCancel() : setStep(s => s - 1)
 
   return (
     <div className="wizard">
-
-      {/* Progress header */}
       <div className="wz-header">
-        <button className="wz-back" onClick={handleBack} aria-label="Back">
-          {step === 0 ? '✕' : '←'}
-        </button>
+        <button className="wz-back" onClick={handleBack}>{step === 0 ? '✕' : '←'}</button>
         <div className="wz-track">
           {STEPS.map((_, i) => <div key={i} className={`wz-pip ${i <= step ? 'on' : ''}`} />)}
         </div>
-        <span className="wz-counter">{step + 1}/{STEPS.length}</span>
+        <span className="wz-counter">
+          {editMode ? 'EDIT' : `${step + 1}/${STEPS.length}`}
+        </span>
       </div>
 
-      {/* Step body — vertically centred, never scrolls */}
       <div className="wz-body">
-
         {step === 0 && (
           <>
-            <p className="wz-question">What do you want<br/>to build?</p>
+            <p className="wz-question">{editMode ? 'Edit goal name.' : 'What do you want\nto build?'}</p>
             <p className="wz-hint">Name your goal clearly and specifically.</p>
             <input className="wz-text-input" placeholder="e.g. Morning run"
               value={form.name} onChange={e => patch({ name: e.target.value })} autoFocus />
@@ -190,16 +217,99 @@ function AddGoalWizard({ onSave, onCancel }) {
             </div>
           </>
         )}
-
       </div>
 
-      {/* Action footer */}
       <div className="wz-footer">
         <button className="wz-next" disabled={!canAdvance} onClick={handleNext}>
-          {step === STEPS.length - 1 ? 'Save Goal' : 'Next'}
+          {step === STEPS.length - 1
+            ? (editMode ? 'Save Changes' : 'Save Goal')
+            : 'Next'}
         </button>
       </div>
+    </div>
+  )
+}
 
+// ─── Challenge Prompt Screen ──────────────────────────────────────────────────
+// Full-screen view to present a weekly challenge for acceptance or decline.
+
+function ChallengePrompt({ challengeDef, onAccept, onDecline }) {
+  const virtue = VIRTUES[challengeDef.virtue]
+  return (
+    <div className="wizard fade-in">
+      <div className="wz-header">
+        <button className="wz-back" onClick={onDecline}>✕</button>
+        <span className="ch-prompt-label">WEEKLY CHALLENGE</span>
+        <div style={{ width: 44 }} />
+      </div>
+
+      <div className="wz-body" style={{ justifyContent: 'flex-start', paddingTop: 32 }}>
+        <div className="ch-virtue-badge" style={{ background: virtue.color + '22', borderColor: virtue.color }}>
+          <span style={{ color: virtue.color }}>{virtue.label.toUpperCase()}</span>
+        </div>
+
+        <p className="ch-title">{challengeDef.title}</p>
+        <p className="ch-desc">{challengeDef.description}</p>
+
+        <div className="ch-detail-block">
+          <div className="ch-detail-row">
+            <span className="ch-detail-label">Constraint</span>
+            <span className="ch-detail-value">{challengeDef.constraint}</span>
+          </div>
+          <div className="ch-detail-row">
+            <span className="ch-detail-label">Completion</span>
+            <span className="ch-detail-value">{challengeDef.completion}</span>
+          </div>
+          <div className="ch-detail-row">
+            <span className="ch-detail-label">Duration</span>
+            <span className="ch-detail-value">{challengeDef.duration} days</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="wz-footer" style={{ display: 'flex', gap: 8 }}>
+        <button className="btn-cancel" onClick={onDecline}>Decline</button>
+        <button className="wz-next" style={{ flex: 2 }} onClick={onAccept}>Accept Challenge</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Challenge Card (Log Tab) ─────────────────────────────────────────────────
+
+function ChallengeCard({ challengeState, onLogDay, onViewDetail }) {
+  const def     = CHALLENGES.find(c => c.id === challengeState.id)
+  if (!def) return null
+  const virtue  = VIRTUES[def.virtue]
+  const today   = todayStr()
+  const doneToday = challengeState.daysLogged.includes(today)
+  const done    = challengeState.daysLogged.length
+  const total   = def.duration
+  const pct     = Math.min(100, (done / total) * 100)
+
+  return (
+    <div className="ch-card" style={{ borderColor: virtue.color + '55' }}>
+      <div className="ch-card-header">
+        <div className="ch-card-dot" style={{ background: virtue.color }} />
+        <div className="ch-card-info">
+          <div className="ch-card-title">{def.title}</div>
+          <div className="ch-card-meta">
+            {virtue.label.toUpperCase()} · {done}/{total} DAYS
+          </div>
+        </div>
+        <button className="ch-card-detail-btn" onClick={onViewDetail}>↗</button>
+      </div>
+
+      <div className="ch-progress-track">
+        <div className="ch-progress-fill" style={{ width: `${pct}%`, background: virtue.color }} />
+      </div>
+
+      <button
+        className={`ch-day-btn ${doneToday ? 'done' : ''}`}
+        style={doneToday ? { borderColor: virtue.color, color: virtue.color } : {}}
+        onClick={onLogDay}>
+        {doneToday ? '✓ Done today' : 'Mark today complete'}
+      </button>
     </div>
   )
 }
@@ -235,7 +345,7 @@ function getPeriodProgress(goal, logs) {
 
 // ─── Log Tab ──────────────────────────────────────────────────────────────────
 
-function LogTab({ goals, logs, onLog }) {
+function LogTab({ goals, logs, onLog, challengeState, onLogChallengeDay, onViewChallenge }) {
   const today     = todayStr()
   const todayLogs = logs[today] || {}
   const score     = calcWeeklyScore(goals, logs)
@@ -294,6 +404,7 @@ function LogTab({ goals, logs, onLog }) {
   const daily    = goals.filter(g => !g.timeframe || ['daily','weekly','fortnight'].includes(g.timeframe))
   const longTerm = goals.filter(g => ['monthly','yearly'].includes(g.timeframe))
   const doneCount = Object.keys(todayLogs).filter(k => todayLogs[k] && todayLogs[k] !== '0').length
+  const showChallenge = challengeState?.accepted && !isChallengeExpired(challengeState)
 
   return (
     <div className="log-tab fade-in">
@@ -326,13 +437,29 @@ function LogTab({ goals, logs, onLog }) {
           })}
         </div>
       </div>
+
+      {showChallenge && (
+        <>
+          <div className="section-header">
+            <span className="section-title">Active Challenge</span>
+          </div>
+          <ChallengeCard
+            challengeState={challengeState}
+            onLogDay={onLogChallengeDay}
+            onViewDetail={onViewChallenge}
+          />
+        </>
+      )}
+
       <div className="section-header">
         <span className="section-title">Today · {today}</span>
         <span className="section-title" style={{ color: 'var(--text)' }}>{doneCount}/{daily.length}</span>
       </div>
+
       {goals.length === 0
         ? <div className="empty-state"><p>No goals defined.</p><p>Add goals in the Goals tab.</p></div>
         : daily.map(renderGoal)}
+
       {longTerm.length > 0 && (
         <>
           <div className="section-header" style={{ marginTop: 24 }}>
@@ -347,15 +474,47 @@ function LogTab({ goals, logs, onLog }) {
 
 // ─── Goals Tab ────────────────────────────────────────────────────────────────
 
-function GoalsTab({ goals, onUpdate, onAddGoal }) {
-  const remove   = id => onUpdate(goals.filter(g => g.id !== id))
+function GoalsTab({ goals, onUpdate, onAddGoal, challengeState, onViewChallenge }) {
+  const [editingGoal, setEditingGoal] = useState(null)
+
+  const remove = id => onUpdate(goals.filter(g => g.id !== id))
+  const saveEdit = updatedGoal => {
+    onUpdate(goals.map(g => g.id === updatedGoal.id ? updatedGoal : g))
+    setEditingGoal(null)
+  }
+
   const byVirtue = Object.keys(VIRTUES).reduce((acc, v) => {
     acc[v] = goals.filter(g => g.virtue === v); return acc
   }, {})
 
+  const challengeAvailable = challengeState && !challengeState.accepted && !challengeState.declined
+  const challengeActive    = challengeState?.accepted && !isChallengeExpired(challengeState)
+  const activeDef          = challengeActive ? CHALLENGES.find(c => c.id === challengeState.id) : null
+
   return (
     <div className="goals-tab fade-in">
+
+      {/* Challenge banner — shown when a challenge is waiting or active */}
+      {challengeAvailable && (
+        <button className="ch-banner" onClick={onViewChallenge}>
+          <span className="ch-banner-icon">◈</span>
+          <span className="ch-banner-text">A weekly challenge is available</span>
+          <span className="ch-banner-arrow">→</span>
+        </button>
+      )}
+      {challengeActive && activeDef && (
+        <div className="ch-active-strip" style={{ borderColor: VIRTUES[activeDef.virtue].color + '66' }}>
+          <div className="ch-active-dot" style={{ background: VIRTUES[activeDef.virtue].color }} />
+          <span className="ch-active-text">{activeDef.title}</span>
+          <span className="ch-active-days">
+            {challengeState.daysLogged.length}/{activeDef.duration}d
+          </span>
+          <button className="ch-active-view" onClick={onViewChallenge}>↗</button>
+        </div>
+      )}
+
       <button className="btn-add" onClick={onAddGoal}>+ Add Goal</button>
+
       {goals.length === 0
         ? <div className="empty-state"><p>No goals defined.</p><p>Add your first goal above.</p></div>
         : Object.entries(byVirtue).map(([key, vGoals]) => {
@@ -379,6 +538,9 @@ function GoalsTab({ goals, onUpdate, onAddGoal }) {
                           : (goal.timeframe || 'daily').toUpperCase()} · WT {goal.weight}
                       </div>
                     </div>
+                    <button className="btn-edit" onClick={() => setEditingGoal(goal)} aria-label="Edit">
+                      <EditIcon />
+                    </button>
                     <button className="btn-delete" onClick={() => remove(goal.id)}>×</button>
                   </div>
                 ))}
@@ -386,6 +548,14 @@ function GoalsTab({ goals, onUpdate, onAddGoal }) {
             )
           })
       }
+
+      {editingGoal && (
+        <GoalWizard
+          initial={editingGoal}
+          onSave={saveEdit}
+          onCancel={() => setEditingGoal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -531,9 +701,7 @@ function SettingsTab({ settings, onUpdate }) {
         <div className="settings-row">
           <span className="settings-label">Reopen Focus Screen</span>
           <button className="select-chip"
-            onClick={() => { storageSet('stoic-focus-date', ''); window.location.reload() }}>
-            Reset
-          </button>
+            onClick={() => { storageSet('stoic-focus-date', ''); window.location.reload() }}>Reset</button>
         </div>
       </div>
       <div className="settings-section">
@@ -546,6 +714,7 @@ function SettingsTab({ settings, onUpdate }) {
                 storageSet('stoic-goals', [])
                 storageSet('stoic-logs', {})
                 storageSet('stoic-virtue-xp', { courage: 0, wisdom: 0, temperance: 0, justice: 0 })
+                storageSet('stoic-challenge', null)
                 storageSet('stoic-focus-date', '')
                 window.location.reload()
               }
@@ -567,18 +736,20 @@ const DEFAULTS = {
 }
 
 export default function App() {
-  const [loaded,     setLoaded]     = useState(false)
-  const [screen,     setScreen]     = useState('focus')
-  const [activeTab,  setActiveTab]  = useState('log')
-  const [addingGoal, setAddingGoal] = useState(false)
-  const [goals,      setGoals]      = useState(DEFAULTS.goals)
-  const [logs,       setLogs]       = useState(DEFAULTS.logs)
-  const [virtueXP,   setVirtueXP]   = useState(DEFAULTS.virtueXP)
-  const [settings,   setSettings]   = useState(DEFAULTS.settings)
-  const [focusTimer, setFocusTimer] = useState(12)
-  const [focusReady, setFocusReady] = useState(false)
-  const [reflection, setReflection] = useState('')
-  const [focusIdx,   setFocusIdx]   = useState(0)
+  const [loaded,          setLoaded]          = useState(false)
+  const [screen,          setScreen]          = useState('focus')
+  const [activeTab,       setActiveTab]       = useState('log')
+  const [addingGoal,      setAddingGoal]      = useState(false)
+  const [challengeState,  setChallengeState]  = useState(null)
+  const [showChallenge,   setShowChallenge]   = useState(false)
+  const [goals,           setGoals]           = useState(DEFAULTS.goals)
+  const [logs,            setLogs]            = useState(DEFAULTS.logs)
+  const [virtueXP,        setVirtueXP]        = useState(DEFAULTS.virtueXP)
+  const [settings,        setSettings]        = useState(DEFAULTS.settings)
+  const [focusTimer,      setFocusTimer]      = useState(12)
+  const [focusReady,      setFocusReady]      = useState(false)
+  const [reflection,      setReflection]      = useState('')
+  const [focusIdx,        setFocusIdx]        = useState(0)
 
   useEffect(() => {
     const g  = storageGet('stoic-goals',     DEFAULTS.goals)
@@ -587,9 +758,23 @@ export default function App() {
     const fd = storageGet('stoic-focus-date','')
     const s  = storageGet('stoic-settings',  DEFAULTS.settings)
     setGoals(g); setLogs(l); setVirtueXP(xp); setSettings(s)
+
     const today = todayStr()
     setFocusIdx(today.split('-').reduce((a, n) => a + parseInt(n, 10), 0) % STOIC_CONTENT.length)
     if (fd === today) setScreen('main')
+
+    // Challenge: check if we need a fresh one for this week
+    const weekKey = getWeekKey()
+    const stored  = storageGet('stoic-challenge', null)
+    if (!stored || stored.weekKey !== weekKey) {
+      const def   = pickChallenge(weekKey)
+      const fresh = { id: def.id, weekKey, accepted: false, declined: false, daysLogged: [], startDate: null }
+      setChallengeState(fresh)
+      storageSet('stoic-challenge', fresh)
+    } else {
+      setChallengeState(stored)
+    }
+
     setLoaded(true)
   }, [])
 
@@ -618,6 +803,34 @@ export default function App() {
     }
   }, [logs, goals, virtueXP])
 
+  const updateChallenge = useCallback(patch => {
+    setChallengeState(prev => {
+      const next = { ...prev, ...patch }
+      storageSet('stoic-challenge', next)
+      return next
+    })
+  }, [])
+
+  const handleAcceptChallenge = useCallback(() => {
+    updateChallenge({ accepted: true, declined: false, startDate: todayStr(), daysLogged: [] })
+    setShowChallenge(false)
+  }, [updateChallenge])
+
+  const handleDeclineChallenge = useCallback(() => {
+    updateChallenge({ declined: true })
+    setShowChallenge(false)
+  }, [updateChallenge])
+
+  const handleLogChallengeDay = useCallback(() => {
+    if (!challengeState) return
+    const today = todayStr()
+    const already = challengeState.daysLogged.includes(today)
+    const daysLogged = already
+      ? challengeState.daysLogged.filter(d => d !== today)
+      : [...challengeState.daysLogged, today]
+    updateChallenge({ daysLogged })
+  }, [challengeState, updateChallenge])
+
   const updateSettings = useCallback(ns => { setSettings(ns); storageSet('stoic-settings', ns) }, [])
 
   if (!loaded) return (
@@ -625,6 +838,8 @@ export default function App() {
       LOADING
     </div>
   )
+
+  const challengeDef = challengeState ? CHALLENGES.find(c => c.id === challengeState.id) : null
 
   return (
     <div className="app-root" data-size={settings.textSize}>
@@ -640,12 +855,23 @@ export default function App() {
               {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
             </span>
           </header>
+
           <div className="tab-content">
-            {activeTab === 'log'      && <LogTab      goals={goals} logs={logs} onLog={logGoal} />}
-            {activeTab === 'goals'    && <GoalsTab    goals={goals} onUpdate={updateGoals} onAddGoal={() => setAddingGoal(true)} />}
+            {activeTab === 'log' && (
+              <LogTab goals={goals} logs={logs} onLog={logGoal}
+                challengeState={challengeState}
+                onLogChallengeDay={handleLogChallengeDay}
+                onViewChallenge={() => setShowChallenge(true)} />
+            )}
+            {activeTab === 'goals' && (
+              <GoalsTab goals={goals} onUpdate={updateGoals} onAddGoal={() => setAddingGoal(true)}
+                challengeState={challengeState}
+                onViewChallenge={() => setShowChallenge(true)} />
+            )}
             {activeTab === 'progress' && <ProgressTab goals={goals} logs={logs} virtueXP={virtueXP} />}
             {activeTab === 'settings' && <SettingsTab settings={settings} onUpdate={updateSettings} />}
           </div>
+
           <nav className="bottom-nav">
             {[
               { id: 'log',      label: 'Log',      Icon: LogIcon },
@@ -660,12 +886,20 @@ export default function App() {
             ))}
           </nav>
 
-          {/* Wizard mounts as position:fixed inside main-app.
-              It is anchored to the viewport directly — no parent can misplace it. */}
+          {/* Goal wizard — add or edit */}
           {addingGoal && (
-            <AddGoalWizard
+            <GoalWizard
               onSave={g => { updateGoals([...goals, g]); setAddingGoal(false) }}
               onCancel={() => setAddingGoal(false)}
+            />
+          )}
+
+          {/* Challenge prompt */}
+          {showChallenge && challengeDef && (
+            <ChallengePrompt
+              challengeDef={challengeDef}
+              onAccept={handleAcceptChallenge}
+              onDecline={handleDeclineChallenge}
             />
           )}
         </div>
