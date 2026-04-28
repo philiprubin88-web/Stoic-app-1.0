@@ -38,6 +38,8 @@ export function calcWeeklyScore(goals, logs) {
     const w = goal.weight || 1
     totalWeight += w * elapsed.length
     elapsed.forEach(date => {
+      // Change 7: only count days on or after goal creation
+      if (goal.createdAt && date < goal.createdAt) { totalWeight -= w; return }
       const val = (logs[date] || {})[goal.id]
       if (goal.type === 'binary' || goal.type === 'streak') {
         if (val === true || val === 1) earnedWeight += w
@@ -60,22 +62,20 @@ export function getTier(score) {
 export function getVirtueLevel(xp) {
   let cur = VIRTUE_LEVELS[0], nxt = VIRTUE_LEVELS[1]
   for (let i = VIRTUE_LEVELS.length - 1; i >= 0; i--) {
-    if (xp >= VIRTUE_LEVELS[i].threshold) {
-      cur = VIRTUE_LEVELS[i]; nxt = VIRTUE_LEVELS[i+1] || null; break
-    }
+    if (xp >= VIRTUE_LEVELS[i].threshold) { cur = VIRTUE_LEVELS[i]; nxt = VIRTUE_LEVELS[i+1] || null; break }
   }
   const progress = nxt ? ((xp - cur.threshold) / (nxt.threshold - cur.threshold)) * 100 : 100
   return { current: cur, next: nxt, progress }
 }
 
-/** Full recalc — used on startup and goal deletion only */
+/** Goal-only XP from logs — used as base for full recalc */
 export function recalcVirtueXP(goals, logs) {
   const xp = { courage: 0, wisdom: 0, temperance: 0, justice: 0 }
   Object.values(logs).forEach(dayLogs => {
     goals.forEach(goal => {
       if (!goal.virtue || !(goal.virtue in xp)) return
       const val = dayLogs[goal.id]
-      let done = goal.type === 'quantitative'
+      const done = goal.type === 'quantitative'
         ? (!isNaN(parseFloat(val)) && parseFloat(val) >= parseFloat(goal.target_value || 1))
         : (val === 1 || val === true)
       if (done) xp[goal.virtue] += (goal.weight || 1) * 10
@@ -84,10 +84,7 @@ export function recalcVirtueXP(goals, logs) {
   return xp
 }
 
-/**
- * Incremental XP delta for a single log change — O(1).
- * Returns { virtue, delta } or null if no change.
- */
+/** Incremental XP delta for a single log change — O(1) */
 export function xpDelta(goal, prevValue, newValue) {
   if (!goal?.virtue) return null
   const wasComplete = isGoalComplete(goal, prevValue)
@@ -106,36 +103,27 @@ export function isGoalComplete(goal, val) {
   return val === 1 || val === true
 }
 
-// ── Streak — capped at 91 (matches 90-day prune window) ──────────────────────
+// ── Streak ────────────────────────────────────────────────────────────────────
 
 export function calcStreak(goalId, logs) {
   let streak = 0
   const today = new Date()
   for (let i = 0; i < 91; i++) {
-    const d = new Date(today)
-    d.setDate(today.getDate() - i)
+    const d = new Date(today); d.setDate(today.getDate() - i)
     const val = (logs[localDateStr(d)] || {})[goalId]
-    if (val === 1 || val === true) {
-      streak++
-    } else {
-      if (i === 0) continue
-      break
-    }
+    if (val === 1 || val === true) { streak++ }
+    else { if (i === 0) continue; break }
   }
   return streak
 }
 
 // ── Period tracking ───────────────────────────────────────────────────────────
 
-// Fixed epoch so fortnightly periods never split on Jan 1
 const FORTNIGHT_EPOCH = new Date(2026, 0, 1)
 
 export function getPeriodDates(timeframe) {
   const now = new Date(); now.setHours(0,0,0,0)
-
-  if (!timeframe || timeframe === 'daily') {
-    const s = localDateStr(now); return { start: s, end: s, totalDays: 1 }
-  }
+  if (!timeframe || timeframe === 'daily') { const s = localDateStr(now); return { start: s, end: s, totalDays: 1 } }
   if (timeframe === 'weekly') {
     const day = now.getDay()
     const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1))
@@ -143,7 +131,6 @@ export function getPeriodDates(timeframe) {
     return { start: localDateStr(mon), end: localDateStr(sun), totalDays: 7 }
   }
   if (timeframe === 'fortnightly') {
-    // Fixed epoch anchor — never resets on Jan 1
     const daysSince = Math.floor((now - FORTNIGHT_EPOCH) / 86400000)
     const ps = new Date(FORTNIGHT_EPOCH); ps.setDate(FORTNIGHT_EPOCH.getDate() + Math.floor(daysSince / 14) * 14)
     const pe = new Date(ps); pe.setDate(ps.getDate() + 13)
@@ -155,42 +142,57 @@ export function getPeriodDates(timeframe) {
     return { start: localDateStr(s), end: localDateStr(e), totalDays: e.getDate() }
   }
   if (timeframe === 'yearly') {
-    const s    = new Date(now.getFullYear(), 0, 1)
-    const e    = new Date(now.getFullYear(), 11, 31)
+    const s = new Date(now.getFullYear(), 0, 1)
+    const e = new Date(now.getFullYear(), 11, 31)
     const leap = (now.getFullYear() % 4 === 0 && now.getFullYear() % 100 !== 0) || now.getFullYear() % 400 === 0
     return { start: localDateStr(s), end: localDateStr(e), totalDays: leap ? 366 : 365 }
   }
   const s = localDateStr(now); return { start: s, end: s, totalDays: 1 }
 }
 
-/** O(log entries in range) — not O(period length) */
 export function getPeriodInfo(goal, logs) {
   const frequency = goal.frequency || 1
   const { start, end, totalDays } = getPeriodDates(goal.timeframe)
   const today = localDateStr(new Date())
 
-  // Filter log keys that fall within period — O(keys in range) not O(period days)
   let completions = 0
   Object.entries(logs).forEach(([date, dayLogs]) => {
     if (date < start || date > end || date > today) return
-    const val = dayLogs[goal.id]
+    const val  = dayLogs[goal.id]
     const done = goal.type === 'quantitative'
       ? (!isNaN(parseFloat(val)) && parseFloat(val) >= parseFloat(goal.target_value || 1))
       : (val === 1 || val === true)
     if (done) completions++
   })
 
-  const now          = new Date(); now.setHours(0,0,0,0)
-  const endDate      = parseLocalDate(end)
-  const daysLeft     = Math.max(0, Math.round((endDate - now) / 86400000) + 1)
-  const daysElapsed  = Math.max(0, totalDays - daysLeft)
-  const needed       = Math.max(0, frequency - completions)
-  const complete     = completions >= frequency
-  const behind       = !complete && needed > daysLeft
-  const expectedNow  = Math.ceil((daysElapsed / totalDays) * frequency)
-  const onTrack      = complete || completions >= expectedNow
+  const now         = new Date(); now.setHours(0,0,0,0)
+  const endDate     = parseLocalDate(end)
+  const daysLeft    = Math.max(0, Math.round((endDate - now) / 86400000) + 1)
+  const daysElapsed = Math.max(0, totalDays - daysLeft)
+  const needed      = Math.max(0, frequency - completions)
+  const complete    = completions >= frequency
+  const behind      = !complete && needed > daysLeft
+  const expectedNow = Math.ceil((daysElapsed / totalDays) * frequency)
+  const onTrack     = complete || completions >= expectedNow
 
   return { completions, frequency, needed, daysLeft, totalDays, complete, behind, onTrack }
+}
+
+// ── Trial helpers ─────────────────────────────────────────────────────────────
+
+/** Returns the end date string (inclusive) for a trial */
+export function trialEndDate(trial, ch) {
+  const end = parseLocalDate(trial.startDate)
+  end.setDate(end.getDate() + ch.duration - 1)
+  return localDateStr(end)
+}
+
+export function isTrialExpired(trial, ch) {
+  return !trial.completed && !trial.expired && localDateStr(new Date()) > trialEndDate(trial, ch)
+}
+
+export function isTrialFinalDay(trial, ch) {
+  return !trial.completed && !trial.expired && localDateStr(new Date()) === trialEndDate(trial, ch)
 }
 
 // ── Log maintenance ───────────────────────────────────────────────────────────
@@ -203,7 +205,5 @@ export function pruneOldLogs(logs, daysToKeep = 90) {
 
 export function uid() { return Math.random().toString(36).slice(2, 9) }
 
-// ── Timeframe display helpers ─────────────────────────────────────────────────
-
-const TIMEFRAME_NOUN = { daily: 'day', weekly: 'week', fortnightly: 'fortnight', monthly: 'month', yearly: 'year' }
+const TIMEFRAME_NOUN = { daily:'day', weekly:'week', fortnightly:'fortnight', monthly:'month', yearly:'year' }
 export function timeframeNoun(tf) { return TIMEFRAME_NOUN[tf] || tf }

@@ -1132,3 +1132,83 @@ body {
 .nav-label { font-size: 8px; letter-spacing: .08em; }
 .nav-item svg { width: 17px; height: 17px; }
 .nav-item { padding: 8px 2px; gap: 2px; }
+
+/* ─── Change 1: null-screen placeholder already black via inline style ────── */
+
+/* ─── Change 4: goal-name-row for inline badge ───────────────────────────── */
+.goal-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── Change 6: score subtitle ───────────────────────────────────────────── */
+.score-subtitle {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* ─── Change 9: goal sort row ────────────────────────────────────────────── */
+.goals-tab-header { margin-bottom: 0; }
+.sort-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.sort-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: .2em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+/* ─── Change 10: final day badge ─────────────────────────────────────────── */
+.final-day-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
+@keyframes pulse-border {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .5; }
+}
+.trial-active-card.final-day {
+  border-color: var(--gold-d);
+}
+
+/* ─── Change 3: expired trial card ──────────────────────────────────────── */
+.trial-expired-card {
+  border: 1px solid var(--rust);
+  border-left: 3px solid var(--rust);
+  padding: 14px;
+  margin-bottom: 8px;
+  background: var(--bg-s);
+  opacity: .85;
+}
+
+/* ─── Change 5: trial history in progress tab ────────────────────────────── */
+.trial-history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+}
+.trial-history-item:last-child { border-bottom: none; }
