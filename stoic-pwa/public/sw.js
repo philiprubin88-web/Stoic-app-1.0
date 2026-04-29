@@ -1,12 +1,11 @@
 /**
  * STOIC Service Worker
- * Strategy: Network-first for HTML, Cache-first for static assets.
- * This prevents the iOS "white screen on launch" caused by stale cached HTML.
+ * CACHE_NAME is stamped at build time by the vite.config.js plugin.
+ * Network-first for HTML prevents iOS white screen on launch.
  */
 
-const CACHE_NAME = 'stoic-v1'
+const CACHE_NAME = 'stoic-__BUILD_TIME__'
 
-// Assets to pre-cache on install (static, fingerprinted by Vite)
 const PRECACHE_URLS = [
   '/',
   '/manifest.webmanifest',
@@ -15,71 +14,52 @@ const PRECACHE_URLS = [
   '/icons/favicon.svg',
 ]
 
-// ── Install: pre-cache shell ────────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE_URLS).catch(err => {
-        // Don't fail install if pre-cache misses a URL
-        console.warn('[SW] Pre-cache partial failure:', err)
-      })
-    }).then(() => self.skipWaiting()) // Activate immediately
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(PRECACHE_URLS).catch(() => {}))
+      .then(() => self.skipWaiting())
   )
 })
 
-// ── Activate: clear old caches ──────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    ).then(() => self.clients.claim()) // Take control of all open tabs
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   )
 })
 
-// ── Fetch: network-first for navigation, cache-first for assets ─────────────
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Skip non-GET and cross-origin requests
   if (request.method !== 'GET' || url.origin !== location.origin) return
 
-  // Navigation requests (HTML pages) → network-first
-  // This is the KEY fix: always try the network for the app shell so iOS
-  // never boots from a stale or empty cached HTML file.
+  // Navigation: network-first — never serve stale HTML from cache
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then(response => {
-          // Cache the fresh HTML
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
-          return response
+        .then(res => {
+          caches.open(CACHE_NAME).then(c => c.put(request, res.clone()))
+          return res
         })
-        .catch(() => {
-          // Offline fallback — serve cached index.html
-          return caches.match('/') || caches.match(request)
-        })
+        .catch(() => caches.match('/').then(r => r || caches.match(request)))
     )
     return
   }
 
-  // Static assets (JS, CSS, images, fonts) → cache-first
+  // Static assets: cache-first
   event.respondWith(
     caches.match(request).then(cached => {
       if (cached) return cached
-      return fetch(request).then(response => {
-        // Only cache valid responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response
+      return fetch(request).then(res => {
+        if (res && res.status === 200 && res.type === 'basic') {
+          caches.open(CACHE_NAME).then(c => c.put(request, res.clone()))
         }
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
-        return response
+        return res
       })
     })
   )
